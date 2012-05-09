@@ -925,4 +925,7 @@
 
     <!-- Set to true for Tegra3 devices -->
     <bool name="config_isTegra3">false</bool>
+
+    <!-- True if the Sym key should open the InputMethodPicker (default) -->
+    <bool name="config_symKeyShowsImePicker">true</bool>
 </resources>

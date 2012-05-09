@@ -3845,4 +3845,7 @@
   <java-symbol type="id" name="time_alt" />
   <java-symbol type="id" name="timeDisplayHours" />
   <java-symbol type="id" name="timeDisplayMinutes" />
+
+  <!-- IME Picker showing upon pressing Sym Key -->
+  <java-symbol type="bool" name="config_symKeyShowsImePicker" />
 </resources>

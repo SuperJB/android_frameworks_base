@@ -4080,6 +4080,12 @@ package android.app {
     field public static final int MODE_NIGHT_YES = 2; // 0x2
   }
 
+  public class VibrationPickerDialog extends android.app.DialogFragment {
+    ctor public VibrationPickerDialog();
+    method public static android.app.VibrationPickerDialog newInstance(android.os.Handler, boolean, java.lang.String);
+    method public void stopAllVibrations();
+  }
+
   public final class WallpaperInfo implements android.os.Parcelable {
     ctor public WallpaperInfo(android.content.Context, android.content.pm.ResolveInfo) throws java.io.IOException, org.xmlpull.v1.XmlPullParserException;
     method public int describeContents();
@@ -9167,9 +9173,14 @@ package android.graphics.drawable {
     method public boolean isOneShot();
     method public boolean isRunning();
     method public void run();
+    method public void setOnAnimationFinishedListener(android.graphics.drawable.AnimationDrawable.OnAnimationFinishedListener);
     method public void setOneShot(boolean);
     method public void start();
     method public void stop();
+  }
+
+  public static abstract interface AnimationDrawable.OnAnimationFinishedListener {
+    method public abstract void onAnimationFinished();
   }
 
   public class BitmapDrawable extends android.graphics.drawable.Drawable {
@@ -11888,6 +11899,27 @@ package android.media {
     field public static final int TONE_SUP_RADIO_ACK = 19; // 0x13
     field public static final int TONE_SUP_RADIO_NOTAVAIL = 20; // 0x14
     field public static final int TONE_SUP_RINGTONE = 23; // 0x17
+  }
+
+  public class VibrationPattern {
+    ctor public VibrationPattern(java.lang.String, java.util.ArrayList<java.lang.Long>, android.content.Context);
+    ctor public VibrationPattern(java.lang.String, java.lang.String, android.content.Context);
+    ctor public VibrationPattern(android.net.Uri, android.content.Context);
+    method public static android.media.VibrationPattern getFallbackVibration(android.content.Context);
+    method public int getLength();
+    method public java.lang.String getName();
+    method public long[] getPattern();
+    method public java.lang.String getPatternString();
+    method public static java.lang.String getPhoneVibration(android.content.Context);
+    method public android.net.Uri getUri();
+    method public void play();
+    method public void setName(java.lang.String);
+    method public void setPatternFromString(java.lang.String);
+    method public void setUri(android.net.Uri);
+    method public void stop();
+    field public static final java.lang.String FALLBACK_NAME = "FALLBACK";
+    field public static final java.lang.String FALLBACK_PATTERN = "500,1000,1000,1000,1000";
+    field public static final java.lang.String URI = "content://com.aokp.romcontrol.Vibrations/vibrations";
   }
 
 }
@@ -17185,6 +17217,7 @@ package android.provider {
 
   public static abstract deprecated interface Contacts.PeopleColumns {
     field public static final deprecated java.lang.String CUSTOM_RINGTONE = "custom_ringtone";
+    field public static final deprecated java.lang.String CUSTOM_VIBRATION = "custom_vibration";
     field public static final deprecated java.lang.String DISPLAY_NAME = "display_name";
     field public static final deprecated java.lang.String LAST_TIME_CONTACTED = "last_time_contacted";
     field public static final deprecated java.lang.String NAME = "name";
@@ -17530,6 +17563,7 @@ package android.provider {
 
   protected static abstract interface ContactsContract.ContactOptionsColumns {
     field public static final java.lang.String CUSTOM_RINGTONE = "custom_ringtone";
+    field public static final java.lang.String CUSTOM_VIBRATION = "custom_vibration";
     field public static final java.lang.String LAST_TIME_CONTACTED = "last_time_contacted";
     field public static final java.lang.String SEND_TO_VOICEMAIL = "send_to_voicemail";
     field public static final java.lang.String STARRED = "starred";
@@ -18489,11 +18523,13 @@ package android.provider {
     field public static final android.net.Uri DEFAULT_ALARM_ALERT_URI;
     field public static final android.net.Uri DEFAULT_NOTIFICATION_URI;
     field public static final android.net.Uri DEFAULT_RINGTONE_URI;
+    field public static final android.net.Uri DEFAULT_VIBRATION_URI;
     field public static final deprecated java.lang.String DEVICE_PROVISIONED = "device_provisioned";
     field public static final java.lang.String DIM_SCREEN = "dim_screen";
     field public static final java.lang.String DTMF_TONE_WHEN_DIALING = "dtmf_tone";
     field public static final java.lang.String END_BUTTON_BEHAVIOR = "end_button_behavior";
     field public static final java.lang.String FONT_SCALE = "font_scale";
+    field public static final java.lang.String FORCE_DUAL_PANEL = "force_dualpanel";
     field public static final java.lang.String HAPTIC_FEEDBACK_ENABLED = "haptic_feedback_enabled";
     field public static final deprecated java.lang.String HTTP_PROXY = "http_proxy";
     field public static final deprecated java.lang.String INSTALL_NON_MARKET_APPS = "install_non_market_apps";
@@ -18504,6 +18540,7 @@ package android.provider {
     field public static final deprecated java.lang.String LOGGING_ID = "logging_id";
     field public static final java.lang.String MODE_RINGER = "mode_ringer";
     field public static final java.lang.String MODE_RINGER_STREAMS_AFFECTED = "mode_ringer_streams_affected";
+    field public static final java.lang.String MODE_TABLET_UI = "mode_tabletui";
     field public static final java.lang.String MUTE_STREAMS_AFFECTED = "mute_streams_affected";
     field public static final deprecated java.lang.String NETWORK_PREFERENCE = "network_preference";
     field public static final java.lang.String NEXT_ALARM_FORMATTED = "next_alarm_formatted";
@@ -18511,6 +18548,7 @@ package android.provider {
     field public static final deprecated java.lang.String PARENTAL_CONTROL_ENABLED = "parental_control_enabled";
     field public static final deprecated java.lang.String PARENTAL_CONTROL_LAST_UPDATE = "parental_control_last_update";
     field public static final deprecated java.lang.String PARENTAL_CONTROL_REDIRECT_URL = "parental_control_redirect_url";
+    field public static final java.lang.String PHONE_VIBRATION = "phone_vibration";
     field public static final java.lang.String RADIO_BLUETOOTH = "bluetooth";
     field public static final java.lang.String RADIO_CELL = "cell";
     field public static final java.lang.String RADIO_NFC = "nfc";
@@ -18528,6 +18566,14 @@ package android.provider {
     field public static final deprecated java.lang.String SHOW_WEB_SUGGESTIONS = "show_web_suggestions";
     field public static final java.lang.String SOUND_EFFECTS_ENABLED = "sound_effects_enabled";
     field public static final java.lang.String STAY_ON_WHILE_PLUGGED_IN = "stay_on_while_plugged_in";
+    field public static final java.lang.String SYSTEMUI_SOFTKEY_IME_SWITCHER = "ime_switcher";
+    field public static final java.lang.String SYSTEMUI_SOFTKEY_KILL_PROCESS = "killcurrent";
+    field public static final java.lang.String SYSTEMUI_SOFTKEY_REBOOT = "reboot";
+    field public static final java.lang.String SYSTEMUI_SOFTKEY_RING_SILENT = "ring_silent";
+    field public static final java.lang.String SYSTEMUI_SOFTKEY_RING_VIB = "ring_vib";
+    field public static final java.lang.String SYSTEMUI_SOFTKEY_RING_VIB_SILENT = "ring_vib_silent";
+    field public static final java.lang.String SYSTEMUI_SOFTKEY_SCREENOFF = "screenoff";
+    field public static final java.lang.String SYSTEMUI_SOFTKEY_SCREENSHOT = "screenshot";
     field public static final java.lang.String SYS_PROP_SETTING_VERSION = "sys.settings_system_version";
     field public static final java.lang.String TEXT_AUTO_CAPS = "auto_caps";
     field public static final java.lang.String TEXT_AUTO_PUNCTUATE = "auto_punctuate";

@@ -21,9 +21,9 @@
 
 #include <GLES2/gl2.h>
 
-#include <ui/Region.h>
-
 #include <SkXfermode.h>
+
+#include <ui/Region.h>
 
 #include "Rect.h"
 #include "SkiaColorFilter.h"

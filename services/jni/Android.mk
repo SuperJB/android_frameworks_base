@@ -1,6 +1,10 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
+ifeq ($(TARGET_BOARD_PLATFORM),exDroid)
+	LOCAL_CFLAGS += -DALLWINNER
+endif
+
 LOCAL_SRC_FILES:= \
     com_android_server_AlarmManagerService.cpp \
     com_android_server_BatteryService.cpp \
@@ -17,6 +21,13 @@ LOCAL_SRC_FILES:= \
     com_android_server_location_GpsLocationProvider.cpp \
     com_android_server_connectivity_Vpn.cpp \
     onload.cpp
+
+ifeq ($(TARGET_BOARD_PLATFORM),exDroid)
+LOCAL_SRC_FILES+= \
+    com_android_server_DisplayManagerService.cpp 
+LOCAL_C_INCLUDES += \
+    frameworks/native/services/surfaceflinger/DisplayHardware
+endif
 
 LOCAL_C_INCLUDES += \
     $(JNI_H_INCLUDE) \

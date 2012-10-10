@@ -1,6 +1,10 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
+ifeq ($(TARGET_BOARD_PLATFORM),exDroid)
+	LOCAL_CFLAGS += -DALLWINNER
+endif
+
 # Only build libhwui when USE_OPENGL_RENDERER is
 # defined in the current device/board configuration
 ifeq ($(USE_OPENGL_RENDERER),true)
@@ -37,7 +41,7 @@ ifeq ($(USE_OPENGL_RENDERER),true)
 		external/skia/include/effects \
 		external/skia/include/images \
 		external/skia/src/ports \
-		external/skia/include/utils
+		external/skia/include/utils 
 
 ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
 	LOCAL_C_INCLUDES += \

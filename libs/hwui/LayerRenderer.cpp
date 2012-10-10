@@ -17,6 +17,7 @@
 #define LOG_TAG "OpenGLRenderer"
 
 #include <ui/Rect.h>
+#include <ui/Region.h>
 
 #include "LayerCache.h"
 #include "LayerRenderer.h"

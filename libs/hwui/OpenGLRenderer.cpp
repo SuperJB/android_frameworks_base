@@ -30,6 +30,7 @@
 #include <private/hwui/DrawGlInfo.h>
 
 #include <ui/Rect.h>
+#include <ui/Region.h>
 
 #include "OpenGLRenderer.h"
 #include "DisplayListRenderer.h"

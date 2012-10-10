@@ -1,6 +1,10 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
+ifeq ($(TARGET_BOARD_PLATFORM),exDroid)
+	LOCAL_CFLAGS += -DALLWINNER
+endif
+
 LOCAL_SRC_FILES:= \
     android_media_MediaCrypto.cpp \
     android_media_MediaCodec.cpp \
@@ -48,6 +52,9 @@ LOCAL_C_INCLUDES += \
     external/tremor/Tremor \
     frameworks/base/core/jni \
     frameworks/av/media/libmedia \
+    frameworks/av/media/libmediaplayerservice \
+    frameworks/av/include/media \
+    frameworks/av/include \
     frameworks/av/media/libstagefright \
     frameworks/av/media/libstagefright/codecs/amrnb/enc/src \
     frameworks/av/media/libstagefright/codecs/amrnb/common \

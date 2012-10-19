@@ -1184,6 +1184,12 @@ public final class Settings {
         public static final Uri CONTENT_URI =
             Uri.parse("content://" + AUTHORITY + "/system");
 
+	 /**
+          * HDMI settings.
+          */
+        public static final String HDMI_DUAL_DISP = "hdmi_dual_disp";
+        public static final String HDMI_SPDIF     = "hdmi_spdif";
+
         /**
          * Whether we keep the device on while the device is plugged in.
          * Supported values are:

@@ -202,6 +202,8 @@ public class PowerManagerService extends IPowerManager.Stub
     private final int MY_UID;
     private final int MY_PID;
 
+    private boolean mHdmiPlugged;
+
     private boolean mDoneBooting = false;
     private boolean mBootCompleted = false;
     private boolean mHeadless = false;
@@ -392,6 +394,13 @@ public class PowerManagerService extends IPowerManager.Stub
         }
     }
     */
+
+    private BroadcastReceiver mHdmiPluggedReceiver = new BroadcastReceiver() {
+        public void onReceive(Context context, Intent intent) {
+            mHdmiPlugged
+                = intent.getBooleanExtra(WindowManagerPolicy.EXTRA_HDMI_PLUGGED_STATE, false);            
+        }
+    };
 
     /**
      * This class works around a deadlock between the lock in PowerManager.WakeLock
@@ -737,6 +746,15 @@ public class PowerManagerService extends IPowerManager.Stub
         filter = new IntentFilter();
         filter.addAction(Intent.ACTION_DOCK_EVENT);
         mContext.registerReceiver(new DockReceiver(), filter);
+
+        // register for hdmi plugged events
+        filter = new IntentFilter();
+        filter.addAction(WindowManagerPolicy.ACTION_HDMI_PLUGGED);
+        Intent intent = mContext.registerReceiver(mHdmiPluggedReceiver, filter);
+        if (intent != null) {
+            // Retrieve current sticky dock event broadcast.
+            mHdmiPlugged = intent.getBooleanExtra(WindowManagerPolicy.EXTRA_HDMI_PLUGGED_STATE, false);
+        }  
 
         // Listen for secure settings changes
         mContext.getContentResolver().registerContentObserver(
@@ -1426,6 +1444,10 @@ public class PowerManagerService extends IPowerManager.Stub
                 }
 
                 if (nextState == -1) {
+                    return;
+                }
+
+                if (mHdmiPlugged || SystemProperties.getBoolean("tv.powermanager.nevertimeout", false)) {
                     return;
                 }
 

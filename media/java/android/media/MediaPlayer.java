@@ -1456,6 +1456,38 @@ public class MediaPlayer
     // But if any keys are defined, the order must be kept in sync with include/media/mediaplayer.h.
     // private static final int KEY_PARAMETER_... = ...;
 
+	/*
+	info video surface layout info,
+	format:left=%d;top=%d;right=%d,...
+	*/
+	public static final int KEY_PARAMETER_AML_VIDEO_POSITION_INFO = 2000;
+
+	/*
+	AMLOGIC_PLAYER?
+	or others
+	*/
+	public static final int KEY_PARAMETER_AML_PLAYER_TYPE_STR = 2001;
+
+	
+	/*
+		int value;
+	*/
+	public static final int KEY_PARAMETER_AML_PLAYER_VIDEO_OUT_TYPE = 2002;
+	
+	//amlogic private API,set only.
+	//switch sound track
+	public static final int KEY_PARAMETER_AML_PLAYER_SWITCH_SOUND_TRACK = 2003;//string,refer to lmono,rmono,stereo,set only
+	//switch audio track
+	public static final int KEY_PARAMETER_AML_PLAYER_SWITCH_AUDIO_TRACK = 2004;//string,refer to audio track index,set only
+
+	public static final int KEY_PARAMETER_AML_PLAYER_TRICKPLAY_FORWARD=2005;//string,refer to forward:speed 
+	public static final int KEY_PARAMETER_AML_PLAYER_TRICKPLAY_BACKWARD=2006;//string,refer to  backward:speed
+	public static final int KEY_PARAMETER_AML_PLAYER_FORCE_HARD_DECODE=2007;//string,refer to mp3,etc.
+	public static final int KEY_PARAMETER_AML_PLAYER_FORCE_SOFT_DECODE=2008;//string,refer to mp3,etc.	
+	
+	public static final int VIDEO_OUT_SOFT_RENDER =	0;
+	public static final int VIDEO_OUT_HARDWARE	=	1;
+
     /**
      * Sets the parameter indicated by key.
      * @param key key indicates the parameter to be set.

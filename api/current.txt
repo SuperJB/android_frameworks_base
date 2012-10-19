@@ -11525,6 +11525,15 @@ package android.media {
     field public static final int DISPLAY_3D_MODE_HALF_PICTURE = 2; // 0x2
     field public static final int MASTER_SCREEN = 0; // 0x0
     field public static final int MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK = 200; // 0xc8
+    field public static final int KEY_PARAMETER_AML_PLAYER_FORCE_HARD_DECODE = 2007; // 0x7d7
+    field public static final int KEY_PARAMETER_AML_PLAYER_FORCE_SOFT_DECODE = 2008; // 0x7d8
+    field public static final int KEY_PARAMETER_AML_PLAYER_SWITCH_AUDIO_TRACK = 2004; // 0x7d4
+    field public static final int KEY_PARAMETER_AML_PLAYER_SWITCH_SOUND_TRACK = 2003; // 0x7d3
+    field public static final int KEY_PARAMETER_AML_PLAYER_TRICKPLAY_BACKWARD = 2006; // 0x7d6
+    field public static final int KEY_PARAMETER_AML_PLAYER_TRICKPLAY_FORWARD = 2005; // 0x7d5
+    field public static final int KEY_PARAMETER_AML_PLAYER_TYPE_STR = 2001; // 0x7d1
+    field public static final int KEY_PARAMETER_AML_PLAYER_VIDEO_OUT_TYPE = 2002; // 0x7d2
+    field public static final int KEY_PARAMETER_AML_VIDEO_POSITION_INFO = 2000; // 0x7d0
     field public static final int MEDIA_ERROR_SERVER_DIED = 100; // 0x64
     field public static final int MEDIA_ERROR_UNKNOWN = 1; // 0x1
     field public static final int MEDIA_INFO_BAD_INTERLEAVING = 800; // 0x320
@@ -11546,6 +11555,8 @@ package android.media {
     field public static final int SUBTITLE_TYPE_TEXT = 0; // 0x0
     field public static final int VIDEO_SCALING_MODE_SCALE_TO_FIT = 1; // 0x1
     field public static final int VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING = 2; // 0x2
+    field public static final int VIDEO_OUT_HARDWARE = 1; // 0x1
+    field public static final int VIDEO_OUT_SOFT_RENDER = 0; // 0x0
   }
 
   public static class MediaPlayer.A10TrackInfo {
@@ -18696,7 +18707,8 @@ package android.provider {
     field public static final java.lang.String FONT_SCALE = "font_scale";
     field public static final java.lang.String FORCE_DUAL_PANEL = "force_dualpanel";
     field public static final java.lang.String HAPTIC_FEEDBACK_ENABLED = "haptic_feedback_enabled";
-    field public static final java.lang.String HIDE_EXTRAS_SYSTEM_BAR = "hide_extras_system_bar";
+    field public static final java.lang.String HDMI_DUAL_DISP = "hdmi_dual_disp";
+    field public static final java.lang.String HDMI_SPDIF = "hdmi_spdif";
     field public static final deprecated java.lang.String HTTP_PROXY = "http_proxy";
     field public static final deprecated java.lang.String INSTALL_NON_MARKET_APPS = "install_non_market_apps";
     field public static final deprecated java.lang.String LOCATION_PROVIDERS_ALLOWED = "location_providers_allowed";
@@ -29207,7 +29219,7 @@ package android.widget {
     method public android.widget.TextView getText2();
   }
 
-  public class VideoView extends android.view.SurfaceView implements android.widget.MediaController.MediaPlayerControl {
+  public class VideoView extends android.view.SurfaceView implements android.widget.MediaController.MediaPlayerControl android.view.View.OnLayoutChangeListener {
     ctor public VideoView(android.content.Context);
     ctor public VideoView(android.content.Context, android.util.AttributeSet);
     ctor public VideoView(android.content.Context, android.util.AttributeSet, int);
@@ -29218,6 +29230,7 @@ package android.widget {
     method public int getCurrentPosition();
     method public int getDuration();
     method public boolean isPlaying();
+    method public void onLayoutChange(android.view.View, int, int, int, int, int, int, int, int);
     method public void pause();
     method public int resolveAdjustedSize(int, int);
     method public void resume();

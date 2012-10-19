@@ -318,11 +318,28 @@ public class WindowManagerService extends IWindowManager.Stub
     final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            mPolicy.enableKeyguard(true);
-            synchronized(mKeyguardTokenWatcher) {
-                // lazily evaluate this next time we're asked to disable keyguard
-                mAllowDisableKeyguard = ALLOW_DISABLE_UNKNOWN;
-                mKeyguardDisabled = false;
+            if(DevicePolicyManager.ACTION_DEVICE_POLICY_MANAGER_STATE_CHANGED.equals(intent.getAction())){                                    
+                 mPolicy.enableKeyguard(true);
+                 synchronized(mKeyguardTokenWatcher) {
+                     // lazily evaluate this next time we're asked to disable keyguard
+                     mAllowDisableKeyguard = ALLOW_DISABLE_UNKNOWN;
+                     mKeyguardDisabled = false;
+                 }
+            }else if (WindowManagerPolicy.ACTION_HDMI_PLUGGED.equals(intent.getAction())) {
+                 mTVOutOn 
+                 	= intent.getBooleanExtra(WindowManagerPolicy.EXTRA_HDMI_PLUGGED_STATE, false);
+                 Slog.i("WindowManagerService ", "TvOut Intent receiver, tvout status="+ mTVOutOn);
+                 if (SystemProperties.getBoolean("ro.vout.dualdisplay", false)
+                    || SystemProperties.getBoolean("ro.vout.dualdisplay2", false)) {
+		    	if (Settings.System.getInt(mContext.getContentResolver(),
+				 Settings.System.HDMI_DUAL_DISP, 1) == 1) {
+                        		mInputManager.setTvOutStatus(false);
+			} else {
+					mInputManager.setTvOutStatus(mTVOutOn); 
+			}
+                 } else {                    
+                    mInputManager.setTvOutStatus(mTVOutOn);
+                 }
             }
         }
     };
@@ -614,6 +631,8 @@ public class WindowManagerService extends IWindowManager.Stub
     AppWindowToken mFocusedApp = null;
 
     PowerManagerService mPowerManager;
+
+    private boolean mTVOutOn = false;
 
     float mWindowAnimationScale = 1.0f;
     float mTransitionAnimationScale = 1.0f;
@@ -914,7 +933,13 @@ public class WindowManagerService extends IWindowManager.Stub
         // Track changes to DevicePolicyManager state so we can enable/disable keyguard.
         IntentFilter filter = new IntentFilter();
         filter.addAction(DevicePolicyManager.ACTION_DEVICE_POLICY_MANAGER_STATE_CHANGED);
-        mContext.registerReceiver(mBroadcastReceiver, filter);
+        filter.addAction(WindowManagerPolicy.ACTION_HDMI_PLUGGED);
+        Intent intent = mContext.registerReceiver(mBroadcastReceiver, filter);    
+        if (intent != null) {
+            // Retrieve current sticky tvout event broadcast.
+            mTVOutOn 
+            	= intent.getBooleanExtra(WindowManagerPolicy.EXTRA_HDMI_PLUGGED_STATE, false);
+        }	
 
         mHoldingScreenWakeLock = pmc.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK
                 | PowerManager.ON_AFTER_RELEASE, "KEEP_SCREEN_ON_FLAG");

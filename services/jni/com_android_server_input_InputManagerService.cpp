@@ -179,6 +179,7 @@ public:
     void setPointerSpeed(int32_t speed);
     void setShowTouches(bool enabled);
     void setStylusIconEnabled(bool enabled);
+    void setTvOutStatus(bool on);
 
     void setKeyLayout(const char* deviceName, const char* keyLayout);
 
@@ -784,6 +785,18 @@ void NativeInputManager::setShowTouches(bool enabled) {
             InputReaderConfiguration::CHANGE_SHOW_TOUCHES);
 }
 
+void NativeInputManager::setTvOutStatus(bool on) {
+    getInputManager()->getReader()->setTvOutStatus(on);
+    { //acquire lock
+        AutoMutex _l(mLock);
+
+        sp<PointerController> controller = mLocked.pointerController.promote();
+        if (controller != NULL) {
+            controller->setTvOutStatus(on);
+        }
+    } //release lock
+}
+
 void NativeInputManager::setStylusIconEnabled(bool enabled) {
     { // acquire lock
         AutoMutex _l(mLock);
@@ -1362,6 +1375,12 @@ static void nativeMonitor(JNIEnv* env, jclass clazz, jint ptr) {
     im->getInputManager()->getDispatcher()->monitor();
 }
 
+static void nativeSetTvOutStatus(JNIEnv* env,
+        jclass clazz, jint ptr, jboolean on) {
+    NativeInputManager* im = reinterpret_cast<NativeInputManager*>(ptr);
+    im->setTvOutStatus(on);
+}
+
 static void nativeSetKeyLayout(JNIEnv* env, jclass clazz, jint ptr,
        jstring deviceName, jstring keyLayout) {
     NativeInputManager* im = reinterpret_cast<NativeInputManager*>(ptr);
@@ -1434,6 +1453,8 @@ static JNINativeMethod gInputManagerMethods[] = {
             (void*) nativeDump },
     { "nativeMonitor", "(I)V",
             (void*) nativeMonitor },
+    { "nativeSetTvOutStatus","(IZ)V",
+	    (void*) nativeSetTvOutStatus} ,
     { "nativeSetKeyLayout", "(ILjava/lang/String;Ljava/lang/String;)V",
             (void*) nativeSetKeyLayout },
 };

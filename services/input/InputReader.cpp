@@ -42,6 +42,7 @@
 #include "InputReader.h"
 
 #include <cutils/log.h>
+#include <cutils/properties.h>
 #include <androidfw/Keyboard.h>
 #include <androidfw/VirtualKeyMap.h>
 
@@ -51,6 +52,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#include <fcntl.h>
 
 #define INDENT "  "
 #define INDENT2 "    "
@@ -64,6 +66,10 @@ namespace android {
 
 // Maximum number of slots supported when using the slot-based Multitouch Protocol B.
 static const size_t MAX_SLOTS = 32;
+
+static char g_dmode_str[32];
+static char g_daxis_str[32];
+
 
 // --- Static Functions ---
 
@@ -688,6 +694,19 @@ void InputReader::requestRefreshConfiguration(uint32_t changes) {
     }
 }
 
+void InputReader::setTvOutStatus(bool enabled){
+    AutoMutex _l(mLock);
+    ALOGI("InputReader::setTvOutStatus %d",enabled);
+
+    size_t numDevices = mDevices.size();
+    for (size_t i = 0; i < numDevices; i++) {
+        InputDevice* device = mDevices.valueAt(i);
+        if (!device->isIgnored()) {
+            device->setTvOutStatus(enabled);
+        }
+    }
+}
+
 void InputReader::vibrate(int32_t deviceId, const nsecs_t* pattern, size_t patternSize,
         ssize_t repeat, int32_t token) {
     AutoMutex _l(mLock);
@@ -1110,6 +1129,14 @@ void InputDevice::bumpGeneration() {
 void InputDevice::notifyReset(nsecs_t when) {
     NotifyDeviceResetArgs args(when, mId);
     mContext->getListener()->notifyDeviceReset(&args);
+}
+
+void InputDevice::setTvOutStatus(bool enabled){
+    size_t numMappers = mMappers.size();
+    for (size_t i = 0; i < numMappers; i++) {
+        InputMapper* mapper = mMappers[i];
+        mapper->setTvOutStatus(enabled);
+    }
 }
 
 
@@ -1820,6 +1847,9 @@ int32_t InputMapper::getMetaState() {
 }
 
 void InputMapper::fadePointer() {
+}
+
+void InputMapper::setTvOutStatus(bool enabled){
 }
 
 status_t InputMapper::getAbsoluteAxisInfo(int32_t axis, RawAbsoluteAxisInfo* axisInfo) {
@@ -2585,8 +2615,9 @@ void CursorInputMapper::fadePointer() {
 
 TouchInputMapper::TouchInputMapper(InputDevice* device) :
         InputMapper(device),
-        mSource(0), mDeviceMode(DEVICE_MODE_DISABLED),
+        mSource(0), mTvOutStatus(false), mPadmouseStatus(false), mDeviceMode(DEVICE_MODE_DISABLED),
         mSurfaceOrientation(-1), mSurfaceWidth(-1), mSurfaceHeight(-1) {
+	  mHWRotation = DISPLAY_ORIENTATION_0;
 }
 
 TouchInputMapper::~TouchInputMapper() {
@@ -2932,6 +2963,21 @@ void TouchInputMapper::configureSurface(nsecs_t when, bool* outResetNeeded) {
         }
     }
 
+    if(!mPadmouseStatus){
+            char property[PROPERTY_VALUE_MAX];
+            if (property_get("ro.sf.hwrotation", property, NULL) > 0) {
+                mHWRotation = atoi(property) / 90;
+                if (DISPLAY_ORIENTATION_90 == mHWRotation || DISPLAY_ORIENTATION_270 == mHWRotation) {
+                    int32_t tmp = mAssociatedDisplayWidth;
+                    mAssociatedDisplayWidth = mAssociatedDisplayHeight;
+                    mAssociatedDisplayHeight = tmp;
+                }
+            }
+    } else {
+	    mAssociatedDisplayOrientation = DISPLAY_ORIENTATION_0;
+	    mHWRotation = DISPLAY_ORIENTATION_0;
+    }
+
     // Configure dimensions.
     int32_t width, height, orientation;
     if (mDeviceMode == DEVICE_MODE_DIRECT || mDeviceMode == DEVICE_MODE_POINTER) {
@@ -3139,7 +3185,7 @@ void TouchInputMapper::configureSurface(nsecs_t when, bool* outResetNeeded) {
             mOrientedRanges.distance.min =
                     mRawPointerAxes.distance.minValue * mDistanceScale;
             mOrientedRanges.distance.max =
-                    mRawPointerAxes.distance.maxValue * mDistanceScale;
+                    mRawPointerAxes.distance.minValue * mDistanceScale;
             mOrientedRanges.distance.flat = 0;
             mOrientedRanges.distance.fuzz =
                     mRawPointerAxes.distance.fuzz * mDistanceScale;
@@ -3150,7 +3196,8 @@ void TouchInputMapper::configureSurface(nsecs_t when, bool* outResetNeeded) {
         // Compute oriented surface dimensions, precision, scales and ranges.
         // Note that the maximum value reported is an inclusive maximum value so it is one
         // unit less than the total width or height of surface.
-        switch (mSurfaceOrientation) {
+        int32_t adjustedorientation = (mSurfaceOrientation + mHWRotation) % 4;
+	switch (adjustedorientation) {
         case DISPLAY_ORIENTATION_90:
         case DISPLAY_ORIENTATION_270:
             mOrientedSurfaceWidth = mSurfaceHeight;
@@ -4122,7 +4169,8 @@ void TouchInputMapper::cookPointerData() {
         // X and Y
         // Adjust coords for surface orientation.
         float x, y;
-        switch (mSurfaceOrientation) {
+        int32_t adjustedorientation = (mSurfaceOrientation + mHWRotation) % 4;
+	switch (adjustedorientation) {
         case DISPLAY_ORIENTATION_90:
             x = float(in.y - mRawPointerAxes.y.minValue) * mYScale;
             y = float(mRawPointerAxes.x.maxValue - in.x) * mXScale;
@@ -5494,6 +5542,57 @@ void TouchInputMapper::fadePointer() {
     }
 }
 
+void TouchInputMapper::setTvOutStatus(bool enabled){
+    bool padmouseStatus = mPadmouseStatus;
+    if( mTvOutStatus != enabled){
+        mTvOutStatus = enabled;
+        String8 padmouseString;
+        if(mTvOutStatus){
+            if ( !getDevice()->getConfiguration().tryGetProperty(String8("touch.tvout.padmouse"),
+                 padmouseString) || padmouseString == "true" ) {
+                    mParameters.deviceType = Parameters::DEVICE_TYPE_POINTER;
+                    padmouseStatus = true;
+                    ALOGW(" tvout touch screen set to padmouse mode ");
+            }
+        }
+        else if(mPadmouseStatus){
+            configureParameters();
+            padmouseStatus = false;
+        }
+
+        if(mPadmouseStatus != padmouseStatus){
+            mPadmouseStatus = padmouseStatus;
+            nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
+            bool outReset = true;
+            configureSurface(now, &outReset);
+            reset(now);
+        }
+    }
+    
+    // dual display
+    char prop_dual[PROPERTY_VALUE_MAX];
+    if (property_get("ro.vout.dualdisplay2", prop_dual, "false")
+        && (strcmp(prop_dual, "true") == 0)) {
+        int fd_dmode = -1;
+        memset(g_dmode_str,0,32);	
+        if((fd_dmode = open("/sys/class/display/mode", O_RDONLY)) >= 0) {
+            int ret_len = read(fd_dmode, g_dmode_str, sizeof(g_dmode_str));
+            close(fd_dmode);
+        } else {
+            ALOGE("open /sys/class/display/mode.");
+    	}
+    	
+        int fd_daxis = -1;
+        memset(g_daxis_str,0,32);	
+        if((fd_daxis = open("/sys/class/display/axis", O_RDONLY)) >= 0) {            
+            int ret_len = read(fd_daxis, g_daxis_str, sizeof(g_daxis_str));
+            close(fd_daxis);
+        } else {
+            ALOGE("open /sys/class/display/mode.");
+    	}                    	   
+    } 
+}
+
 void TouchInputMapper::unfadePointer(PointerControllerInterface::Transition transition) {
     if (mPointerController != NULL &&
             !(mPointerUsage == POINTER_USAGE_STYLUS && !mConfig.stylusIconEnabled)) {
@@ -5561,8 +5660,15 @@ void TouchInputMapper::assignPointerIds() {
     if (currentPointerCount == 1 && lastPointerCount == 1
             && mCurrentRawPointerData.pointers[0].toolType
                     == mLastRawPointerData.pointers[0].toolType) {
-        // Only one pointer and no change in count so it must have the same id as before.
-        uint32_t id = mLastRawPointerData.pointers[0].id;
+        uint32_t id;
+        if (!mCurrentRawPointerData.isHovering(0) &&
+                !mLastRawPointerData.hoveringIdBits.isEmpty()) {
+            // 1 finger released and touching again. Should be safe to reset to id 0.
+            id = 0;
+        } else {
+            // Only one pointer and no change in count so it must have the same id as before.
+            id = mLastRawPointerData.pointers[0].id;
+        }
         mCurrentRawPointerData.pointers[0].id = id;
         mCurrentRawPointerData.idToIndex[id] = 0;
         mCurrentRawPointerData.markIdBit(id, mCurrentRawPointerData.isHovering(0));

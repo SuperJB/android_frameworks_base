@@ -805,7 +805,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
         setFocusableInTouchMode(true);
         setWillNotDraw(false);
         setAlwaysDrawnWithCacheEnabled(false);
-        setScrollingCacheEnabled(false);
+        setScrollingCacheEnabled(true);
 
         final ViewConfiguration configuration = ViewConfiguration.get(mContext);
         mTouchSlop = configuration.getScaledTouchSlop();
@@ -1565,10 +1565,10 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
      * @see View#setDrawingCacheEnabled(boolean)
      */
     public void setScrollingCacheEnabled(boolean enabled) {
-        if (mScrollingCacheEnabled) {
+        if (mScrollingCacheEnabled && !enabled) {
             clearScrollingCache();
         }
-        mScrollingCacheEnabled = false;
+        mScrollingCacheEnabled = enabled;
     }
 
     /**
@@ -4878,9 +4878,9 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
 
     private void createScrollingCache() {
         if (mScrollingCacheEnabled && !mCachingStarted && !isHardwareAccelerated()) {
-            setChildrenDrawnWithCacheEnabled(false);
-            setChildrenDrawingCacheEnabled(false);
-            mCachingStarted = mCachingActive = false;
+            setChildrenDrawnWithCacheEnabled(true);
+            setChildrenDrawingCacheEnabled(true);
+            mCachingStarted = mCachingActive = true;
         }
     }
 

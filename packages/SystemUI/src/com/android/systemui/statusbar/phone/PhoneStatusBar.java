@@ -91,6 +91,8 @@ import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.RotationToggle;
 import com.android.systemui.statusbar.SignalClusterView;
 import com.android.systemui.statusbar.StatusBarIconView;
+import com.android.systemui.statusbar.policy.DateView;
+import com.android.systemui.statusbar.policy.DisplayController;
 import com.android.systemui.statusbar.policy.BatteryController;
 import com.android.systemui.statusbar.policy.BatteryControllerNotification;
 import com.android.systemui.statusbar.policy.DateView;
@@ -155,6 +157,7 @@ public class PhoneStatusBar extends BaseStatusBar {
     //BatteryController mBatteryController;
     LocationController mLocationController;
     NetworkController mNetworkController;
+    DisplayController mDisplayController;
 
     int mNaturalBarHeight = -1;
     int mIconSize = -1;
@@ -483,6 +486,7 @@ public class PhoneStatusBar extends BaseStatusBar {
         mLocationController = new LocationController(mContext); // will post a notification
         //mBatteryController = new BatteryController(mContext);
         //mBatteryController.addIconView((ImageView)mStatusBarView.findViewById(R.id.battery));
+        mDisplayController = new DisplayController(mContext);
         mNetworkController = new NetworkController(mContext);
         SignalClusterView signalCluster =
                 (SignalClusterView)mStatusBarView.findViewById(R.id.signal_cluster);

@@ -2069,6 +2069,12 @@ public final class Settings {
         public static final String HAPTIC_FEEDBACK_ENABLED = "haptic_feedback_enabled";
 
         /**
+         * Whether the haptic feedback are enabled for statusbar toggles. The value is
+         * boolean (1 or 0).
+         */
+        public static final String HAPTIC_FEEDBACK_TOGGLES_ENABLED = "haptic_feedback_toggles_enabled";
+
+        /**
          * @deprecated Each application that shows web suggestions should have its own
          * setting for this.
          */
@@ -2270,6 +2276,12 @@ public final class Settings {
          * @hide
          */
         public static final String UI_FORCE_OVERFLOW_BUTTON = "ui_force_overflow_button";
+
+        /**
+         * Toggle to let trackball wake the screen.
+         * @hide
+         */
+        public static final String TRACKBALL_WAKE_SCREEN = "trackball_wake_screen";
 
         /**
          * Settings to backup. This is here so that it's in the same place as the settings
@@ -2655,6 +2667,18 @@ public final class Settings {
          */
         public static final String NAVIGATION_BAR_WIDTH = "navigation_bar_width";
 
+        /**
+         *
+         * @hide
+         */
+        public static final String NAVIGATION_BAR_WIDTH_PORT = "navigation_bar_width_port";
+
+        /**
+         *
+         * @hide
+         */
+        public static final String NAVIGATION_BAR_WIDTH_LAND = "navigation_bar_width_land";
+
          /**
          * @hide
          */
@@ -2768,6 +2792,16 @@ public final class Settings {
         /**
          * @hide
          */
+        public static final String STATUSBAR_SETTINGS_BEHAVIOR = "statusbar_settings_behavior";
+
+        /**
+         * @hide
+         */
+        public static final String STATUSBAR_TOGGLES_AUTOHIDE = "statusbar_toggles_autohide";
+
+        /**
+         * @hide
+         */
         public static final String STATUS_BAR_BRIGHTNESS_SLIDER = "statusbar_brightness_slider";
 
         /**
@@ -2867,6 +2901,13 @@ public final class Settings {
          */
         public static final String VIBRATE_NOTIF_EXPAND = "vibrate_notif_expand";
 
+        /**
+         * @hide
+         * Show Wifi network name in notification shade
+         * 0 - don't show
+         * 1 - show
+         */
+        public static final String NOTIFICATION_SHOW_WIFI_SSID = "notification_show_wifi_ssid";
 
         /**
          * @hide
@@ -2909,6 +2950,21 @@ public final class Settings {
          * @hide
          */
         public static final String LOCKSCREEN_WEATHER_TYPE = "lockscreen_weather_type";
+
+        /**
+         *
+         *
+         * @hide
+         */
+        public static final String WEATHER_PANEL_LONGCLICK = "weather_panel_longclick";
+
+        /**
+         *
+         *
+         * @hide
+         */
+        public static final String WEATHER_PANEL_SHORTCLICK = "weather_panel_shortclick";
+
 
         /**
          * Whether to show upcoming events on lockscreen
@@ -2964,6 +3020,15 @@ public final class Settings {
          * @hide
          */
         public static final String STATUSBAR_WEATHER_STYLE = "statusbar_weather_style";
+
+        /**
+         * How to hide weather panel
+         * 1 = Default always on
+         * 2 = Same as toggles
+         * 3 = Opposite toggles
+         * @hide
+         */
+        public static final String STATUSBAR_WEATHER_HIDE = "statusbar_weather_hide";
 
         /**
          * Whether to show the battery bar
@@ -3046,6 +3111,12 @@ public final class Settings {
          * @hide
          */
         public static final String QUIET_HOURS_DIM = "quiet_hours_dim";
+
+        /**
+         * Key to store Torch state.
+         * @hide
+         */
+        public static final String TORCH_STATE = "torch_state";
 
         /**
          * where to show the legacy menu key
@@ -3238,6 +3309,34 @@ public final class Settings {
          * @hide
          */
         public static final String KILL_APP_LONGPRESS_BACK = "kill_app_longpress_back";
+
+        /**
+         *
+         *
+         * @hide
+         */
+        public static final String NOTIFICATION_DATE_LONGCLICK = "notification_date_longclick";
+
+        /**
+         *
+         *
+         * @hide
+         */
+        public static final String NOTIFICATION_DATE_SHORTCLICK = "notification_date_shortclick";
+
+        /**
+         *
+         *
+         * @hide
+         */
+        public static final String NOTIFICATION_CLOCK_LONGCLICK = "notification_clock_longclick";
+
+        /**
+         *
+         *
+         * @hide
+         */
+        public static final String NOTIFICATION_CLOCK_SHORTCLICK = "notification_clock_shortclick";
 
         /**
          * Whether to show statusbar signal text

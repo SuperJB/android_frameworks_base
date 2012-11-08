@@ -437,12 +437,12 @@ class KeyguardStatusViewManager implements OnClickListener {
     private void updateWeatherInfo() {
         final ContentResolver res = getContext().getContentResolver();
         final boolean weatherInfoEnabled = (Settings.System.getBoolean(res,
-                Settings.System.LOCKSCREEN_WEATHER, false)
+                Settings.System.LOCKSCREEN_WEATHER, true)
                 && (Settings.System.getBoolean(res, Settings.System.USE_WEATHER, false))
                 && mShowingStatus);
 
         final boolean weatherLocationEnabled = Settings.System.getBoolean(res,
-                Settings.System.WEATHER_SHOW_LOCATION, false);
+                Settings.System.WEATHER_SHOW_LOCATION, true);
 
         final int weatherInfoType = Settings.System.getInt(res,
                 Settings.System.LOCKSCREEN_WEATHER_TYPE, 0);
@@ -560,7 +560,7 @@ class KeyguardStatusViewManager implements OnClickListener {
         // prioritizes what to show in that space when all transient messages are gone.
         CharSequence string = null;
         mLockAlwaysBattery = Settings.System.getInt(getContext().getContentResolver(),
-                Settings.System.LOCKSCREEN_BATTERY, 0) == 1;
+                Settings.System.LOCKSCREEN_BATTERY, 1) == 1;
         if (mShowingBatteryInfo || mLockAlwaysBattery) {
             // Battery status
             if (mPluggedIn) {
@@ -594,7 +594,7 @@ class KeyguardStatusViewManager implements OnClickListener {
     private CharSequence getPriorityTextMessage(MutableInt icon) {
         CharSequence string = null;
         mLockAlwaysBattery = Settings.System.getInt(getContext().getContentResolver(),
-                Settings.System.LOCKSCREEN_BATTERY, 0) == 1;
+                Settings.System.LOCKSCREEN_BATTERY, 1) == 1;
         if (!TextUtils.isEmpty(mInstructionText)) {
             // Instructions only
             string = mInstructionText;

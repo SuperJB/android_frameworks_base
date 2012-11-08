@@ -577,7 +577,7 @@ public class PhoneStatusBar extends BaseStatusBar {
             public void onTextChanged(CharSequence s, int start, int before,
                     int count) {
                  if (Settings.System.getBoolean(mContext.getContentResolver(),
-                        Settings.System.NOTIFICATION_SHOW_WIFI_SSID, false) &&
+                        Settings.System.NOTIFICATION_SHOW_WIFI_SSID, true) &&
                         count > 0) {
                     mWifiView.setVisibility(View.VISIBLE);
                 }
@@ -3087,7 +3087,7 @@ public class PhoneStatusBar extends BaseStatusBar {
         }
         
         mWeatherPanelEnabled = (Settings.System.getInt(cr,
-                Settings.System.STATUSBAR_WEATHER_STYLE, 2) == 1)
+                Settings.System.STATUSBAR_WEATHER_STYLE, 1) == 1)
                 && (Settings.System.getBoolean(cr, Settings.System.USE_WEATHER, false));
 
         mWeatherPanel.setVisibility(mWeatherPanelEnabled ? View.VISIBLE : View.GONE);

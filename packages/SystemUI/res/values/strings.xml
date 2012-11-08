@@ -429,6 +429,8 @@
 
     <string name="wifi">WIFI</string>
     <string name="bt">BT</string>
+    <string name="network">2G</string>
+    <string name="data">DATA</string>
     <string name="gps">GPS</string>
     <string name="rotate">ROTATE</string>
     <string name="swagger">SWAGGER</string>

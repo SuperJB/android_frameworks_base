@@ -1146,7 +1146,7 @@ public class NetworkController extends BroadcastReceiver {
             combinedLabel = customLabel;
             mobileLabel = customLabel;
             if (!Settings.System.getBoolean(mContext.getContentResolver(),
-                    Settings.System.NOTIFICATION_SHOW_WIFI_SSID, false)) {
+                    Settings.System.NOTIFICATION_SHOW_WIFI_SSID, true)) {
                 wifiLabel = customLabel;
             }
         }

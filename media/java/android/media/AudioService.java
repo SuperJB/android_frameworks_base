@@ -2148,11 +2148,15 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                     //   (step <= oldIndex < 2 * step) is equivalent to: (old UI index == 1)
                     if (step <= oldIndex && oldIndex < 2 * step) {
                         ringerMode = RINGER_MODE_VIBRATE;
+                        if (mVoiceCapable)
+                            adjustVolumeIndex = false;
                     }
                 } else {
                     // (oldIndex < step) is equivalent to (old UI index == 0)
                     if ((oldIndex < step) && mPrevVolDirection != AudioManager.ADJUST_LOWER) {
                         ringerMode = RINGER_MODE_SILENT;
+                        if (mVoiceCapable)
+                            adjustVolumeIndex = false;
                     }
                 }
             }
@@ -2468,10 +2472,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
 
                 // retrieve current volume for device
                 String name = getSettingNameForDevice(false /* lastAudible */, device);
-                // if no volume stored for current stream and device, use default volume if default
-                // device, continue otherwise
-                int defaultIndex = (device == AudioSystem.DEVICE_OUT_DEFAULT) ?
-                                        AudioManager.DEFAULT_STREAM_VOLUME[mStreamType] : -1;
+                // if no volume stored for current stream and device, use default volume
+                int defaultIndex = AudioManager.DEFAULT_STREAM_VOLUME[mStreamType];
                 int index = Settings.System.getInt(mContentResolver, name, defaultIndex);
                 if (index == -1) {
                     continue;
@@ -3523,9 +3525,16 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                     // Volume restore capping
                     final boolean capVolumeRestore = Settings.System.getInt(mContentResolver,
                             Settings.System.SAFE_HEADSET_VOLUME_RESTORE, 1) == 1;
-                    if (capVolumeRestore) {
-                        for (int stream = 0; stream < AudioSystem.getNumStreamTypes(); stream++) {
-                            if (stream == mStreamVolumeAlias[stream]) {
+
+                    for (int stream = 0; stream < AudioSystem.getNumStreamTypes(); stream++) {
+                        if (stream == mStreamVolumeAlias[stream]) {
+                            VolumeStreamState streamState = mStreamStates[mStreamVolumeAlias[stream]];
+                            device = getDeviceForStream(stream);
+                            // apply stored value for device
+                            streamState.applyDeviceVolume(device);
+
+                            // now reduce volume if required
+                            if (capVolumeRestore) {
                                 final int volume = getStreamVolume(stream);
                                 final int restoreCap = rescaleIndex(HEADSET_VOLUME_RESTORE_CAP,
                                         AudioSystem.STREAM_MUSIC, stream);
@@ -3540,6 +3549,16 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                     // Avoid disconnection glitches
                     if (noDelayInATwoDP) {
                         setBluetoothA2dpOnInt(true);
+                    }
+
+                    // Restore volumes
+                    for (int stream = 0; stream < AudioSystem.getNumStreamTypes(); stream++) {
+                        if (stream == mStreamVolumeAlias[stream]) {
+                            VolumeStreamState streamState = mStreamStates[mStreamVolumeAlias[stream]];
+                            device = getDeviceForStream(stream);
+                            // apply stored value for device
+                            streamState.applyDeviceVolume(device);
+                        }
                     }
                 }
             } else if (action.equals(Intent.ACTION_USB_AUDIO_ACCESSORY_PLUG) ||

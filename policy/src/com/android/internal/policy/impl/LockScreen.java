@@ -22,9 +22,11 @@ import com.android.internal.policy.impl.KeyguardUpdateMonitor.InfoCallbackImpl;
 import com.android.internal.policy.impl.KeyguardUpdateMonitor.SimStateCallback;
 import com.android.internal.telephony.IccCard.State;
 import com.android.internal.widget.DigitalClock;
+import com.android.internal.widget.DigitalClockAlt;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.internal.widget.SlidingTab;
 import com.android.internal.widget.WaveView;
+import com.android.internal.widget.multiwaveview.CirclesView;
 import com.android.internal.widget.multiwaveview.GlowPadView;
 import com.android.internal.widget.multiwaveview.TargetDrawable;
 
@@ -90,6 +92,7 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
     private static final String TAG = "LockScreen";
     private static final String ENABLE_MENU_KEY_FILE = "/data/local/enable_menu_key";
     private static final int WAIT_FOR_ANIMATION_TIMEOUT = 0;
+    private static final int WAIT_FOR_ANIMATION_TIMEOUT_ALT = 500;
     private static final int STAY_ON_WHILE_GRABBED_TIMEOUT = 30000;
     private static final String ASSIST_ICON_METADATA_NAME = "com.android.systemui.action_assist_icon";
     private static final String RING_VIB_SILENT_CMP = "com.android.systemui.RingVibSilentToggle";
@@ -129,8 +132,10 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
     private boolean mSearchDisabled;
     // Is there a vibrator
     private final boolean mHasVibrator;
+    private boolean mCirclesLock;
 
     private DigitalClock mDigitalClock;
+    private DigitalClockAlt mDigitalClockAlt;
 
     InfoCallbackImpl mInfoCallback = new InfoCallbackImpl() {
 
@@ -295,6 +300,52 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
         }
         public void cleanUp() {
             mWaveView.setOnTriggerListener(null);
+        }
+    }
+
+    class CirclesViewMethods implements CirclesView.OnTriggerListener, UnlockWidgetCommonMethods {
+
+        private final CirclesView mCirclesView;
+
+        CirclesViewMethods(CirclesView circlesView) {
+            mCirclesView = circlesView;
+        }
+        /** {@inheritDoc} */
+        public void onTrigger(View v, int whichHandle) {
+            if (whichHandle == CirclesView.OnTriggerListener.CENTER_HANDLE) {
+                requestUnlockScreen();
+            }
+        }
+
+        /** {@inheritDoc} */
+        public void onGrabbedStateChange(View v, int grabbedState) {
+            // Don't poke the wake lock when returning to a state where the handle is
+            // not grabbed since that can happen when the system (instead of the user)
+            // cancels the grab.
+            if (grabbedState == CirclesView.OnTriggerListener.CENTER_HANDLE) {
+                mCallback.pokeWakelock(STAY_ON_WHILE_GRABBED_TIMEOUT);
+            }
+        }
+
+        public void updateResources() {
+        }
+
+        public View getView() {
+            return mCirclesView;
+        }
+        public void reset(boolean animate) {
+            mCirclesView.reset();
+        }
+        public void ping() {
+        }
+        public void setEnabled(int resourceId, boolean enabled) {
+            // Not used
+        }
+        public int getTargetPosition(int resourceId) {
+            return -1; // Not supported
+        }
+        public void cleanUp() {
+            mCirclesView.setOnTriggerListener(null);
         }
     }
 
@@ -512,6 +563,9 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
 
         }
 
+        public void onTargetChange(View v, int target) {
+        }
+
         public void onTrigger(View v, int target) {
             if (mStoredTargets == null) {
                 final int resId = mGlowPadView.getResourceIdForTarget(target);
@@ -659,7 +713,8 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
             public void run() {
                 mCallback.goToUnlockScreen();
             }
-        }, WAIT_FOR_ANIMATION_TIMEOUT);
+        }, mCirclesLock ? WAIT_FOR_ANIMATION_TIMEOUT_ALT
+                : WAIT_FOR_ANIMATION_TIMEOUT);
     }
 
     private void toggleRingMode() {
@@ -706,6 +761,7 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
         mUpdateMonitor = updateMonitor;
         mCallback = callback;
         mLockscreenTargets = Settings.System.getInt(mContext.getContentResolver(), Settings.System.LOCKSCREEN_TARGET_AMOUNT, LAYOUT_TRI);
+        mCirclesLock = Settings.System.getBoolean(mContext.getContentResolver(), Settings.System.USE_CIRCLES_LOCKSCREEN, false);
         mSettingsObserver = new SettingsObserver(new Handler());
         mSettingsObserver.observe();
 
@@ -729,20 +785,28 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
             case LAYOUT_QUAD:
             case LAYOUT_HEPTA:
                 if (landscape)
-                    inflater.inflate(R.layout.keyguard_screen_tab_unlock_land, this,
-                            true);
+                    inflater.inflate(mCirclesLock ?
+                            R.layout.keyguard_screen_tab_unlock_circles_land :
+                            R.layout.keyguard_screen_tab_unlock_land,
+                            this, true);
                 else
-                    inflater.inflate(R.layout.keyguard_screen_tab_unlock, this,
-                            true);
+                    inflater.inflate(mCirclesLock ?
+                            R.layout.keyguard_screen_tab_unlock_circles :
+                            R.layout.keyguard_screen_tab_unlock,
+                            this, true);
                 break;
             case LAYOUT_HEXA:
             case LAYOUT_OCTO:
                 if (landscape)
-                    inflater.inflate(R.layout.keyguard_screen_tab_octounlock_land, this,
-                            true);
+                    inflater.inflate(mCirclesLock ?
+                            R.layout.keyguard_screen_tab_unlock_circles_land :
+                            R.layout.keyguard_screen_tab_octounlock_land,
+                            this, true);
                 else
-                    inflater.inflate(R.layout.keyguard_screen_tab_octounlock, this,
-                            true);
+                    inflater.inflate(mCirclesLock ?
+                            R.layout.keyguard_screen_tab_unlock_circles :
+                            R.layout.keyguard_screen_tab_octounlock,
+                            this, true);
                 break;
             }
 
@@ -778,6 +842,11 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
             SlidingTabMethods slidingTabMethods = new SlidingTabMethods(slidingTabView);
             slidingTabView.setOnTriggerListener(slidingTabMethods);
             return slidingTabMethods;
+        } else if (unlockWidget instanceof CirclesView) {
+            CirclesView circlesView = (CirclesView) unlockWidget;
+            CirclesViewMethods circlesViewMethods = new CirclesViewMethods(circlesView);
+            circlesView.setOnTriggerListener(circlesViewMethods);
+            return circlesViewMethods;
         } else if (unlockWidget instanceof WaveView) {
             WaveView waveView = (WaveView) unlockWidget;
             WaveViewMethods waveViewMethods = new WaveViewMethods(waveView);
@@ -936,7 +1005,11 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
 
         // digital clock first (see @link com.android.internal.widget.DigitalClock.updateTime())
         try {
-            mDigitalClock.updateTime();
+            if (mCirclesLock) {
+                mDigitalClockAlt.updateTime();
+            } else {
+                mDigitalClock.updateTime();
+            }
         } catch (NullPointerException npe) {
             if (DEBUG) Log.d(TAG, "date update time failed: NullPointerException");
         }

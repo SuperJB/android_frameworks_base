@@ -28,32 +28,10 @@
 
 package android.webkit;
 
-import android.Manifest.permission;
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.content.Context;
-import android.content.pm.PackageManager;
-import android.graphics.Point;
-import android.graphics.SurfaceTexture;
-import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.media.Metadata;
 import android.net.Uri;
-import android.opengl.GLES20;
-import android.os.PowerManager;
-import android.util.Log;
-import android.view.Display;
-import android.view.Gravity;
-import android.view.MotionEvent;
-import android.view.Surface;
-import android.view.TextureView;
-import android.view.View;
-import android.view.ViewGroup;
-import android.view.WindowManager;
-import android.widget.FrameLayout;
-import android.widget.MediaController;
-import android.widget.MediaController.MediaPlayerControl;
-
+import android.webkit.HTML5VideoViewProxy;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -84,7 +62,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
     static final int STATE_PREPARING          = 1;
     static final int STATE_PREPARED           = 2;
     static final int STATE_PLAYING            = 3;
-    static final int STATE_BUFFERING          = 4;
+    static final int STATE_RESETTED           = 4;
     static final int STATE_RELEASED           = 5;
 
     static final int ANIMATION_STATE_NONE     = 0;
@@ -246,11 +224,9 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         }
     }
 
-    public void release() {
-        if (mCurrentState != STATE_RELEASED) {
-            stopPlayback();
-            mPlayer.release();
-            mSurfaceTexture.release();
+    public void reset() {
+        if (mCurrentState < STATE_RESETTED) {
+            mPlayer.reset();
         }
         mCurrentState = STATE_RELEASED;
     }
@@ -259,6 +235,18 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         if (mCurrentState == STATE_PREPARED) {
             mPlayer.stop();
         }
+    }
+
+    public static void release() {
+        if (mPlayer != null && mCurrentState != STATE_RELEASED) {
+            mPlayer.release();
+            mPlayer = null;
+        }
+        mCurrentState = STATE_RELEASED;
+    }
+
+    public boolean isReleased() {
+        return mCurrentState == STATE_RELEASED;
     }
 
     public boolean getPauseDuringPreparing() {
@@ -610,123 +598,9 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
     public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
     }
 
-    /**
-     * Invoked when the specified {@link SurfaceTexture} is about to be destroyed.
-     * If returns true, no rendering should happen inside the surface texture after this method
-     * is invoked. If returns false, the client needs to call {@link SurfaceTexture#release()}.
-     *
-     * @param surface The surface about to be destroyed
-     */
-    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        // Tells the TextureView not to free the buffer
+    public boolean fullScreenExited() {
+        // Only meaningful for HTML5VideoFullScreen
         return false;
-    }
-
-    public void enterFullscreenVideoState(WebViewClassic webView, float x, float y, float w, float h) {
-        if (mIsFullscreen == true)
-            return;
-        mIsFullscreen = true;
-        mAnimationState = ANIMATION_STATE_NONE;
-        mCurrentBufferPercentage = 0;
-        mPlayer.setOnBufferingUpdateListener(mBufferingUpdateListener);
-        mInlineX = x;
-        mInlineY = y;
-        mInlineWidth = w;
-        mInlineHeight = h;
-
-        assert(mSurfaceTexture != null);
-        mTextureView = new VideoTextureView(mProxy.getContext(), getSurfaceTexture());
-        mTextureView.setOnTouchListener(this);
-        mTextureView.setFocusable(true);
-        mTextureView.setFocusableInTouchMode(true);
-        mTextureView.requestFocus();
-
-        mLayout = new FrameLayout(mProxy.getContext());
-        FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                            Gravity.CENTER);
-        mTextureView.setVisibility(View.VISIBLE);
-        mTextureView.setSurfaceTextureListener(this);
-
-        mLayout.addView(mTextureView, layoutParams);
-
-        mLayout.setVisibility(View.VISIBLE);
-        WebChromeClient client = webView.getWebChromeClient();
-        if (client != null) {
-            client.onShowCustomView(mLayout, mCallback);
-            // Plugins like Flash will draw over the video so hide
-            // them while we're playing.
-            if (webView.getViewManager() != null)
-                webView.getViewManager().hideAll();
-
-            // Add progress view
-            mProgressView = client.getVideoLoadingProgressView();
-            if (mProgressView != null) {
-                mLayout.addView(mProgressView, layoutParams);
-                if (mCurrentState != STATE_PREPARED)
-                    mProgressView.setVisibility(View.VISIBLE);
-                else
-                    mProgressView.setVisibility(View.GONE);
-            }
-        }
-    }
-
-    public void exitFullscreenVideoState(float x, float y, float w, float h) {
-        if (mIsFullscreen == false) {
-            return;
-        }
-        mIsFullscreen = false;
-
-        mInlineX = x;
-        mInlineY = y;
-        mInlineWidth = w;
-        mInlineHeight = h;
-
-        // Don't show the controller after exiting the full screen.
-        if (mMediaController != null) {
-            mMediaController.hide();
-            mMediaController = null;
-        }
-
-        if (mAnimationState == ANIMATION_STATE_STARTED) {
-            mTextureView.animate().cancel();
-            finishExitingFullscreen();
-        } else {
-            // fullscreen to inline zoom in animation
-            mTextureView.animate().setListener(new AnimatorListenerAdapter() {
-                public void onAnimationEnd(Animator animation) {
-                    finishExitingFullscreen();
-                }
-            });
-
-            mTextureView.animate().setDuration(ANIMATION_DURATION);
-            mTextureView.animate().scaleX(getInlineXScale()).scaleY(getInlineYScale()).translationX(getInlineXOffset()).translationY(getInlineYOffset());
-        }
-    }
-
-    public boolean isFullscreenMode() {
-        return mIsFullscreen;
-    }
-
-    // MediaController FUNCTIONS:
-    public boolean canPause() {
-        return mCanPause;
-    }
-
-    public boolean canSeekBackward() {
-        return mCanSeekBack;
-    }
-
-    public boolean canSeekForward() {
-        return mCanSeekForward;
-    }
-
-    public int getBufferPercentage() {
-        if (mPlayer != null) {
-            return mCurrentBufferPercentage;
-        }
-        return 0;
     }
 
     private boolean mStartWhenPrepared = false;

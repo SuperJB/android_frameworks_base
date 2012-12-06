@@ -37,7 +37,7 @@ import android.os.Bundle;
 import android.os.PatternMatcher;
 import android.os.Process;
 import android.os.RemoteException;
-import android.os.UserId;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -79,6 +79,7 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
     private int mIconDpi;
     private int mIconSize;
     private int mMaxColumns;
+    private int mLastSelected = GridView.INVALID_POSITION;
 
     private boolean mRegistered;
     private boolean mUseAltGrid;
@@ -137,7 +138,7 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
         mAdapter = new ResolveListAdapter(this, intent, initialIntents, rList,
                 mLaunchedFromUid);
         int count = mAdapter.getCount();
-        if (mLaunchedFromUid < 0 || UserId.isIsolated(mLaunchedFromUid)) {
+        if (mLaunchedFromUid < 0 || UserHandle.isIsolated(mLaunchedFromUid)) {
             // Gulp!
             finish();
             return;
@@ -260,6 +261,7 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
         if (mAlwaysUseOption) {
             final int checkedPos = mGrid.getCheckedItemPosition();
             final boolean enabled = checkedPos != GridView.INVALID_POSITION;
+            mLastSelected = checkedPos;
             if (!mUseAltGrid) {
                 mAlwaysButton.setEnabled(enabled);
                 mOnceButton.setEnabled(enabled);
@@ -272,20 +274,21 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
 
     @Override
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-        if (mAlwaysUseOption) {
-            final int checkedPos = mGrid.getCheckedItemPosition();
-            final boolean enabled = checkedPos != GridView.INVALID_POSITION;
+        final int checkedPos = mGrid.getCheckedItemPosition();
+        final boolean hasValidSelection = checkedPos != GridView.INVALID_POSITION;
+        if (mAlwaysUseOption && (!hasValidSelection || mLastSelected != checkedPos)) {
             if (!mUseAltGrid) {
-                mAlwaysButton.setEnabled(enabled);
-                mOnceButton.setEnabled(enabled);
-            } 
-            if (enabled) {
+                mAlwaysButton.setEnabled(hasValidSelection);
+                mOnceButton.setEnabled(hasValidSelection);
+            }
+            if (hasValidSelection) {
                 if (mUseAltGrid) {
-                    startSelected(position,mAlwaysCheckBox.isChecked());
+                    startSelected(position, mAlwaysCheckBox.isChecked());
                 } else {
                     mGrid.smoothScrollToPosition(checkedPos);
                 }
             }
+            mLastSelected = checkedPos;
         } else {
             startSelected(position, false);
         }
@@ -392,7 +395,8 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
 
     void showAppDetails(ResolveInfo ri) {
         Intent in = new Intent().setAction("android.settings.APPLICATION_DETAILS_SETTINGS")
-                .setData(Uri.fromParts("package", ri.activityInfo.packageName, null));
+                .setData(Uri.fromParts("package", ri.activityInfo.packageName, null))
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
         startActivity(in);
     }
 

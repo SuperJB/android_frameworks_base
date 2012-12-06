@@ -108,5 +108,7 @@ interface IWifiManager
     Messenger getWifiStateMachineMessenger();
 
     String getConfigFile();
+
+    void captivePortalCheckComplete();
 }
 

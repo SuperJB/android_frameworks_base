@@ -25,6 +25,7 @@ import com.android.server.wm.WindowManagerService;
 import android.graphics.Point;
 import android.os.SystemProperties;
 import android.util.Slog;
+import android.view.Display;
 
 /**
  * Activity manager code dealing with processes.
@@ -101,15 +102,24 @@ class ProcessList {
     // The maximum number of hidden processes we will keep around before
     // killing them; this is just a control to not let us go too crazy with
     // keeping around processes on devices with large amounts of RAM.
-    static final int MAX_HIDDEN_APPS;
+    static final int MAX_HIDDEN_APPS = 24;
 
-    static {
-        // Allow more hidden apps on huge memory devices (1.5GB or higher)
-        // or fetch from the system property
-        MemInfoReader mi = new MemInfoReader();
-        MAX_HIDDEN_APPS = SystemProperties.getInt("sys.mem.max_hidden_apps",
-                mi.getTotalSize() > 1572864 ? 40 : 15);
-    }
+    // We allow empty processes to stick around for at most 30 minutes.
+    static final long MAX_EMPTY_TIME = 30*60*1000;
+
+    // The number of hidden at which we don't consider it necessary to do
+    // memory trimming.
+    static final int TRIM_HIDDEN_APPS = 3;
+
+    // The number of empty apps at which we don't consider it necessary to do
+    // memory trimming.
+    static final int TRIM_EMPTY_APPS = 3;
+
+    // Threshold of number of hidden+empty where we consider memory critical.
+    static final int TRIM_CRITICAL_THRESHOLD = 3;
+
+    // Threshold of number of hidden+empty where we consider memory critical.
+    static final int TRIM_LOW_THRESHOLD = 5;
 
     // We put empty content processes after any hidden processes that have
     // been idle for less than 15 seconds.
@@ -155,7 +165,7 @@ class ProcessList {
     void applyDisplaySize(WindowManagerService wm) {
         if (!mHaveDisplaySize) {
             Point p = new Point();
-            wm.getInitialDisplaySize(p);
+            wm.getInitialDisplaySize(Display.DEFAULT_DISPLAY, p);
             if (p.x != 0 && p.y != 0) {
                 updateOomLevels(p.x, p.y, true);
                 mHaveDisplaySize = true;

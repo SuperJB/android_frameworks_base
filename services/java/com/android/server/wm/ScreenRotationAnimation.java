@@ -25,6 +25,7 @@ import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.util.Slog;
+import android.view.Display;
 import android.view.Surface;
 import android.view.SurfaceSession;
 import android.view.animation.Animation;
@@ -41,11 +42,13 @@ class ScreenRotationAnimation {
     static final int FREEZE_LAYER = WindowManagerService.TYPE_LAYER_MULTIPLIER * 200;
 
     final Context mContext;
+    final Display mDisplay;
     Surface mSurface;
     BlackFrame mCustomBlackFrame;
     BlackFrame mExitingBlackFrame;
     BlackFrame mEnteringBlackFrame;
     int mWidth, mHeight;
+    int mExitAnimId, mEnterAnimId;
 
     int mSnapshotRotation;
     int mOriginalRotation;
@@ -186,13 +189,16 @@ class ScreenRotationAnimation {
                 pw.println();
     }
 
-    public ScreenRotationAnimation(Context context, SurfaceSession session,
-            boolean inTransaction, int originalWidth, int originalHeight, int originalRotation) {
+    public ScreenRotationAnimation(Context context, Display display, SurfaceSession session,
+            boolean inTransaction, int originalWidth, int originalHeight, int originalRotation,
+            int exitAnim, int enterAnim) {
         mContext = context;
-        // Allow for abnormal hardware orientation
-        mSnapshotRotation = (4 - android.os.SystemProperties.getInt("ro.sf.hwrotation",0) / 90) % 4;
-        if (mSnapshotRotation == Surface.ROTATION_0 || mSnapshotRotation == Surface.ROTATION_180) {
-            if (originalRotation == Surface.ROTATION_90
+        mDisplay = display;
+        mExitAnimId = exitAnim;
+        mEnterAnimId = enterAnim;
+
+        // Screenshot does NOT include rotation!
+        if (originalRotation == Surface.ROTATION_90
                 || originalRotation == Surface.ROTATION_270) {
                 mWidth = originalHeight;
                 mHeight = originalWidth;
@@ -223,17 +229,20 @@ class ScreenRotationAnimation {
         try {
             try {
                 if (WindowManagerService.DEBUG_SURFACE_TRACE) {
-                    mSurface = new SurfaceTrace(session, 0, "FreezeSurface", -1, mWidth, mHeight,
-                        PixelFormat.OPAQUE, Surface.FX_SURFACE_SCREENSHOT | Surface.HIDDEN);
+                    mSurface = new SurfaceTrace(session, "FreezeSurface",
+                            mWidth, mHeight,
+                            PixelFormat.OPAQUE, Surface.FX_SURFACE_SCREENSHOT | Surface.HIDDEN);
                 } else {
-                    mSurface = new Surface(session, 0, "FreezeSurface", -1, mWidth, mHeight,
-                        PixelFormat.OPAQUE, Surface.FX_SURFACE_SCREENSHOT | Surface.HIDDEN);
+                    mSurface = new Surface(session, "FreezeSurface",
+                            mWidth, mHeight,
+                            PixelFormat.OPAQUE, Surface.FX_SURFACE_SCREENSHOT | Surface.HIDDEN);
                 }
                 if (!mSurface.isValid()) {
                     // Screenshot failed, punt.
                     mSurface = null;
                     return;
                 }
+                mSurface.setLayerStack(mDisplay.getLayerStack());
                 mSurface.setLayer(FREEZE_LAYER + 1);
                 mSurface.setAlpha(0);
                 mSurface.show();
@@ -245,7 +254,7 @@ class ScreenRotationAnimation {
                     WindowManagerService.SHOW_SURFACE_ALLOC) Slog.i(WindowManagerService.TAG,
                             "  FREEZE " + mSurface + ": CREATE");
 
-            setRotation(originalRotation);
+            setRotationInTransaction(originalRotation);
         } finally {
             if (!inTransaction) {
                 Surface.closeTransaction();
@@ -265,7 +274,7 @@ class ScreenRotationAnimation {
         return delta;
     }
 
-    void setSnapshotTransform(Matrix matrix, float alpha) {
+    private void setSnapshotTransformInTransaction(Matrix matrix, float alpha) {
         if (mSurface != null) {
             matrix.getValues(mTmpFloats);
             mSurface.setPosition(mTmpFloats[Matrix.MTRANS_X],
@@ -308,7 +317,7 @@ class ScreenRotationAnimation {
     }
 
     // Must be called while in a transaction.
-    private void setRotation(int rotation) {
+    private void setRotationInTransaction(int rotation) {
         mCurRotation = rotation;
 
         // Compute the transformation matrix that must be applied
@@ -318,13 +327,13 @@ class ScreenRotationAnimation {
         createRotationMatrix(delta, mWidth, mHeight, mSnapshotInitialMatrix);
 
         if (DEBUG_STATE) Slog.v(TAG, "**** ROTATION: " + delta);
-        setSnapshotTransform(mSnapshotInitialMatrix, 1.0f);
+        setSnapshotTransformInTransaction(mSnapshotInitialMatrix, 1.0f);
     }
 
     // Must be called while in a transaction.
-    public boolean setRotation(int rotation, SurfaceSession session,
+    public boolean setRotationInTransaction(int rotation, SurfaceSession session,
             long maxAnimationDuration, float animationScale, int finalWidth, int finalHeight) {
-        setRotation(rotation);
+        setRotationInTransaction(rotation);
         if (TWO_PHASE_ANIMATION) {
             return startAnimation(session, maxAnimationDuration, animationScale,
                     finalWidth, finalHeight, false);
@@ -380,58 +389,68 @@ class ScreenRotationAnimation {
                 + finalWidth + " finalHeight=" + finalHeight
                 + " origWidth=" + mOriginalWidth + " origHeight=" + mOriginalHeight);
 
-        switch (delta) {
-            case Surface.ROTATION_0:
-                mRotateExitAnimation = AnimationUtils.loadAnimation(mContext,
-                        com.android.internal.R.anim.screen_rotate_0_exit);
-                mRotateEnterAnimation = AnimationUtils.loadAnimation(mContext,
-                        com.android.internal.R.anim.screen_rotate_0_enter);
-                if (USE_CUSTOM_BLACK_FRAME) {
-                    mRotateFrameAnimation = AnimationUtils.loadAnimation(mContext,
-                            com.android.internal.R.anim.screen_rotate_0_frame);
-                }
-                break;
-            case Surface.ROTATION_90:
-                mRotateExitAnimation = AnimationUtils.loadAnimation(mContext,
-                        com.android.internal.R.anim.screen_rotate_plus_90_exit);
-                mRotateEnterAnimation = AnimationUtils.loadAnimation(mContext,
-                        com.android.internal.R.anim.screen_rotate_plus_90_enter);
-                if (USE_CUSTOM_BLACK_FRAME) {
-                    mRotateFrameAnimation = AnimationUtils.loadAnimation(mContext,
-                            com.android.internal.R.anim.screen_rotate_plus_90_frame);
-                }
-                break;
-            case Surface.ROTATION_180:
-                mRotateExitAnimation = AnimationUtils.loadAnimation(mContext,
-                        com.android.internal.R.anim.screen_rotate_180_exit);
-                mRotateEnterAnimation = AnimationUtils.loadAnimation(mContext,
-                        com.android.internal.R.anim.screen_rotate_180_enter);
-                mRotateFrameAnimation = AnimationUtils.loadAnimation(mContext,
-                        com.android.internal.R.anim.screen_rotate_180_frame);
-                break;
-            case Surface.ROTATION_270:
-                mRotateExitAnimation = AnimationUtils.loadAnimation(mContext,
-                        com.android.internal.R.anim.screen_rotate_minus_90_exit);
-                mRotateEnterAnimation = AnimationUtils.loadAnimation(mContext,
-                        com.android.internal.R.anim.screen_rotate_minus_90_enter);
-                if (USE_CUSTOM_BLACK_FRAME) {
-                    mRotateFrameAnimation = AnimationUtils.loadAnimation(mContext,
-                            com.android.internal.R.anim.screen_rotate_minus_90_frame);
-                }
-                break;
+        final boolean customAnim;
+        if (mExitAnimId != 0 && mEnterAnimId != 0) {
+            customAnim = true;
+            mRotateExitAnimation = AnimationUtils.loadAnimation(mContext, mExitAnimId);
+            mRotateEnterAnimation = AnimationUtils.loadAnimation(mContext, mEnterAnimId);
+        } else {
+            customAnim = false;
+            switch (delta) {
+                case Surface.ROTATION_0:
+                    mRotateExitAnimation = AnimationUtils.loadAnimation(mContext,
+                            com.android.internal.R.anim.screen_rotate_0_exit);
+                    mRotateEnterAnimation = AnimationUtils.loadAnimation(mContext,
+                            com.android.internal.R.anim.screen_rotate_0_enter);
+                    if (USE_CUSTOM_BLACK_FRAME) {
+                        mRotateFrameAnimation = AnimationUtils.loadAnimation(mContext,
+                                com.android.internal.R.anim.screen_rotate_0_frame);
+                    }
+                    break;
+                case Surface.ROTATION_90:
+                    mRotateExitAnimation = AnimationUtils.loadAnimation(mContext,
+                            com.android.internal.R.anim.screen_rotate_plus_90_exit);
+                    mRotateEnterAnimation = AnimationUtils.loadAnimation(mContext,
+                            com.android.internal.R.anim.screen_rotate_plus_90_enter);
+                    if (USE_CUSTOM_BLACK_FRAME) {
+                        mRotateFrameAnimation = AnimationUtils.loadAnimation(mContext,
+                                com.android.internal.R.anim.screen_rotate_plus_90_frame);
+                    }
+                    break;
+                case Surface.ROTATION_180:
+                    mRotateExitAnimation = AnimationUtils.loadAnimation(mContext,
+                            com.android.internal.R.anim.screen_rotate_180_exit);
+                    mRotateEnterAnimation = AnimationUtils.loadAnimation(mContext,
+                            com.android.internal.R.anim.screen_rotate_180_enter);
+                    if (USE_CUSTOM_BLACK_FRAME) {
+                        mRotateFrameAnimation = AnimationUtils.loadAnimation(mContext,
+                                com.android.internal.R.anim.screen_rotate_180_frame);
+                    }
+                    break;
+                case Surface.ROTATION_270:
+                    mRotateExitAnimation = AnimationUtils.loadAnimation(mContext,
+                            com.android.internal.R.anim.screen_rotate_minus_90_exit);
+                    mRotateEnterAnimation = AnimationUtils.loadAnimation(mContext,
+                            com.android.internal.R.anim.screen_rotate_minus_90_enter);
+                    if (USE_CUSTOM_BLACK_FRAME) {
+                        mRotateFrameAnimation = AnimationUtils.loadAnimation(mContext,
+                                com.android.internal.R.anim.screen_rotate_minus_90_frame);
+                    }
+                    break;
+            }
         }
-
-        // Compute partial steps between original and final sizes.  These
-        // are used for the dimensions of the exiting and entering elements,
-        // so they are never stretched too significantly.
-        final int halfWidth = (finalWidth + mOriginalWidth) / 2;
-        final int halfHeight = (finalHeight + mOriginalHeight) / 2;
 
         // Initialize the animations.  This is a hack, redefining what "parent"
         // means to allow supplying the last and next size.  In this definition
         // "%p" is the original (let's call it "previous") size, and "%" is the
         // screen's current/new size.
         if (TWO_PHASE_ANIMATION && firstStart) {
+            // Compute partial steps between original and final sizes.  These
+            // are used for the dimensions of the exiting and entering elements,
+            // so they are never stretched too significantly.
+            final int halfWidth = (finalWidth + mOriginalWidth) / 2;
+            final int halfHeight = (finalHeight + mOriginalHeight) / 2;
+
             if (DEBUG_STATE) Slog.v(TAG, "Initializing start and finish animations");
             mStartEnterAnimation.initialize(finalWidth, finalHeight,
                     halfWidth, halfHeight);
@@ -483,6 +502,7 @@ class ScreenRotationAnimation {
             mRotateFrameAnimation.scaleCurrentDuration(animationScale);
         }
 
+        final int layerStack = mDisplay.getLayerStack();
         if (USE_CUSTOM_BLACK_FRAME && mCustomBlackFrame == null) {
             if (WindowManagerService.SHOW_LIGHT_TRANSACTIONS || DEBUG_STATE) Slog.i(
                     WindowManagerService.TAG,
@@ -501,7 +521,8 @@ class ScreenRotationAnimation {
                 Rect outer = new Rect(-mOriginalWidth*1, -mOriginalHeight*1,
                         mOriginalWidth*2, mOriginalHeight*2);
                 Rect inner = new Rect(0, 0, mOriginalWidth, mOriginalHeight);
-                mCustomBlackFrame = new BlackFrame(session, outer, inner, FREEZE_LAYER + 3);
+                mCustomBlackFrame = new BlackFrame(session, outer, inner, FREEZE_LAYER + 3,
+                        layerStack);
                 mCustomBlackFrame.setMatrix(mFrameInitialMatrix);
             } catch (Surface.OutOfResourcesException e) {
                 Slog.w(TAG, "Unable to allocate black surface", e);
@@ -513,25 +534,25 @@ class ScreenRotationAnimation {
             }
         }
 
-        if (mExitingBlackFrame == null) {
+        if (!customAnim && mExitingBlackFrame == null) {
             if (WindowManagerService.SHOW_LIGHT_TRANSACTIONS || DEBUG_STATE) Slog.i(
                     WindowManagerService.TAG,
                     ">>> OPEN TRANSACTION ScreenRotationAnimation.startAnimation");
             Surface.openTransaction();
-
-            // Compute the transformation matrix that must be applied
-            // the the black frame to make it stay in the initial position
-            // before the new screen rotation.  This is different than the
-            // snapshot transformation because the snapshot is always based
-            // of the native orientation of the screen, not the orientation
-            // we were last in.
-            createRotationMatrix(delta, mOriginalWidth, mOriginalHeight, mFrameInitialMatrix);
-
             try {
+                // Compute the transformation matrix that must be applied
+                // the the black frame to make it stay in the initial position
+                // before the new screen rotation.  This is different than the
+                // snapshot transformation because the snapshot is always based
+                // of the native orientation of the screen, not the orientation
+                // we were last in.
+                createRotationMatrix(delta, mOriginalWidth, mOriginalHeight, mFrameInitialMatrix);
+
                 Rect outer = new Rect(-mOriginalWidth*1, -mOriginalHeight*1,
                         mOriginalWidth*2, mOriginalHeight*2);
                 Rect inner = new Rect(0, 0, mOriginalWidth, mOriginalHeight);
-                mExitingBlackFrame = new BlackFrame(session, outer, inner, FREEZE_LAYER + 2);
+                mExitingBlackFrame = new BlackFrame(session, outer, inner, FREEZE_LAYER + 2,
+                        layerStack);
                 mExitingBlackFrame.setMatrix(mFrameInitialMatrix);
             } catch (Surface.OutOfResourcesException e) {
                 Slog.w(TAG, "Unable to allocate black surface", e);
@@ -543,7 +564,7 @@ class ScreenRotationAnimation {
             }
         }
 
-        if (false && mEnteringBlackFrame == null) {
+        if (customAnim && mEnteringBlackFrame == null) {
             if (WindowManagerService.SHOW_LIGHT_TRANSACTIONS || DEBUG_STATE) Slog.i(
                     WindowManagerService.TAG,
                     ">>> OPEN TRANSACTION ScreenRotationAnimation.startAnimation");
@@ -553,7 +574,8 @@ class ScreenRotationAnimation {
                 Rect outer = new Rect(-finalWidth*1, -finalHeight*1,
                         finalWidth*2, finalHeight*2);
                 Rect inner = new Rect(0, 0, finalWidth, finalHeight);
-                mEnteringBlackFrame = new BlackFrame(session, outer, inner, FREEZE_LAYER);
+                mEnteringBlackFrame = new BlackFrame(session, outer, inner, FREEZE_LAYER,
+                        layerStack);
             } catch (Surface.OutOfResourcesException e) {
                 Slog.w(TAG, "Unable to allocate black surface", e);
             } finally {
@@ -845,7 +867,7 @@ class ScreenRotationAnimation {
         return more;
     }
 
-    void updateSurfaces() {
+    void updateSurfacesInTransaction() {
         if (!mStarted) {
             return;
         }
@@ -885,7 +907,7 @@ class ScreenRotationAnimation {
             }
         }
 
-        setSnapshotTransform(mSnapshotFinalMatrix, mExitTransformation.getAlpha());
+        setSnapshotTransformInTransaction(mSnapshotFinalMatrix, mExitTransformation.getAlpha());
     }
 
     public boolean stepAnimationLocked(long now) {

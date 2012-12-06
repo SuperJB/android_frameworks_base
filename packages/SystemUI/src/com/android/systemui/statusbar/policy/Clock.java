@@ -23,10 +23,10 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
+import android.database.ContentObserver;
 import android.graphics.Canvas;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
-import android.database.ContentObserver;
 import android.os.Handler;
 import android.provider.Settings;
 import android.text.Spannable;
@@ -38,6 +38,7 @@ import android.text.style.RelativeSizeSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.StyleSpan;
 import android.util.AttributeSet;
+import android.util.Slog;
 import android.view.View;
 import android.widget.TextView;
 
@@ -63,20 +64,20 @@ public class Clock extends TextView {
     public static final int PROTEKK_O_CLOCK     = 3;
 
     protected int mAmPmStyle = AM_PM_STYLE_GONE;
-    
-    public static final int WEEKDAY_STYLE_GONE    = 0;
-    public static final int WEEKDAY_STYLE_SMALL   = 1;
-    public static final int WEEKDAY_STYLE_NORMAL  = 2;
+
+    public static final int WEEKDAY_STYLE_GONE   = 0;
+    public static final int WEEKDAY_STYLE_SMALL  = 1;
+    public static final int WEEKDAY_STYLE_NORMAL = 2;
 
     protected int mWeekdayStyle = WEEKDAY_STYLE_GONE;
-    
-    public static final int STYLE_HIDE_CLOCK    = 0;
-    public static final int STYLE_CLOCK_RIGHT   = 1;
-    public static final int STYLE_CLOCK_CENTER  = 2;
+
+    public static final int STYLE_HIDE_CLOCK     = 0;
+    public static final int STYLE_CLOCK_RIGHT    = 1;
+    public static final int STYLE_CLOCK_CENTER   = 2;
 
     protected int mClockStyle = STYLE_CLOCK_RIGHT;
 
-    protected int mClockColor;
+    protected int mClockColor = com.android.internal.R.color.holo_blue_light;
 
     public Clock(Context context) {
         this(context, null);
@@ -116,10 +117,6 @@ public class Clock extends TextView {
         // The time zone may have changed while the receiver wasn't registered, so update the Time
         mCalendar = Calendar.getInstance(TimeZone.getDefault());
 
-        // Make sure we update to the current time
-        //no need to updateClock here, since we call updateSettings() which has updateClock();
-        //updateClock();
-        
         SettingsObserver settingsObserver = new SettingsObserver(new Handler());
         settingsObserver.observe();
         updateSettings();
@@ -182,19 +179,18 @@ public class Clock extends TextView {
         } else {
             sdf = mClockFormat;
         }
-        
+
         Calendar calendar = Calendar.getInstance();
         int day = calendar.get(Calendar.DAY_OF_WEEK);
-        
+
         String todayIs = null;
-        
         String result = sdf.format(mCalendar.getTime());
 
         if (mWeekdayStyle != WEEKDAY_STYLE_GONE) {
-        	todayIs = whatDay(day);
-        	result = todayIs + result;
+            todayIs = (new SimpleDateFormat("E")).format(mCalendar.getTime()) + " ";
+            result = todayIs + result;
         }
-        
+
         SpannableStringBuilder formatted = new SpannableStringBuilder(result);
 
         if (!b24) {
@@ -211,14 +207,14 @@ public class Clock extends TextView {
                     if (mAmPmStyle == AM_PM_STYLE_SMALL) {
                         CharacterStyle style = new RelativeSizeSpan(0.7f);
                         formatted.setSpan(style, result.indexOf(AmPm), result.lastIndexOf(AmPm)+AmPm.length(),
-                                          Spannable.SPAN_EXCLUSIVE_INCLUSIVE);
+                                Spannable.SPAN_EXCLUSIVE_INCLUSIVE);
                     }
                 }
             }
         }
         if (mWeekdayStyle != WEEKDAY_STYLE_NORMAL) {
-        	if (todayIs != null) {
-        		if (mWeekdayStyle == WEEKDAY_STYLE_GONE) {
+            if (todayIs != null) {
+                if (mWeekdayStyle == WEEKDAY_STYLE_GONE) {
                     formatted.delete(result.indexOf(todayIs), result.lastIndexOf(todayIs)+todayIs.length());
                 } else {
                     if (mWeekdayStyle == WEEKDAY_STYLE_SMALL) {
@@ -264,6 +260,11 @@ public class Clock extends TextView {
         return todayIs.toUpperCase() + " ";
     }
     
+=======
+        return formatted;
+    }
+
+>>>>>>> aokp/jb-mr1
     protected class SettingsObserver extends ContentObserver {
         SettingsObserver(Handler handler) {
             super(handler);
@@ -294,7 +295,8 @@ public class Clock extends TextView {
 
     protected void updateSettings() {
         ContentResolver resolver = mContext.getContentResolver();
-        int newColor = 0;
+        int defaultColor = getResources().getColor(
+                com.android.internal.R.color.holo_blue_light);
 
         mAmPmStyle = Settings.System.getInt(resolver,
                 Settings.System.STATUSBAR_CLOCK_AM_PM_STYLE, AM_PM_STYLE_GONE);   
@@ -302,14 +304,14 @@ public class Clock extends TextView {
                 Settings.System.STATUSBAR_CLOCK_STYLE, STYLE_CLOCK_RIGHT);
         mWeekdayStyle = Settings.System.getInt(resolver,
                 Settings.System.STATUSBAR_CLOCK_WEEKDAY, WEEKDAY_STYLE_GONE);
-        
-        newColor = Settings.System.getInt(resolver,
-                Settings.System.STATUSBAR_CLOCK_COLOR, mClockColor);
-        if (newColor < 0 && newColor != mClockColor) {
-            // Color has changed and is valid.
-            mClockColor = newColor;
-            setTextColor(mClockColor);
+
+        mClockColor = Settings.System.getInt(resolver,
+                Settings.System.STATUSBAR_CLOCK_COLOR, defaultColor);
+        if (mClockColor == Integer.MIN_VALUE) {
+            // flag to reset the color
+            mClockColor = defaultColor;
         }
+        setTextColor(mClockColor);
 
         updateClockVisibility();
         updateClock();

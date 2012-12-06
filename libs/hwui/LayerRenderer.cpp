@@ -19,6 +19,8 @@
 #include <ui/Rect.h>
 #include <ui/Region.h>
 
+#include <private/hwui/DrawGlInfo.h>
+
 #include "LayerCache.h"
 #include "LayerRenderer.h"
 #include "Matrix.h"
@@ -41,7 +43,12 @@ LayerRenderer::LayerRenderer(Layer* layer): mLayer(layer) {
 LayerRenderer::~LayerRenderer() {
 }
 
-int LayerRenderer::prepareDirty(float left, float top, float right, float bottom, bool opaque) {
+void LayerRenderer::setViewport(int width, int height) {
+    initViewport(width, height);
+}
+
+status_t LayerRenderer::prepareDirty(float left, float top, float right, float bottom,
+        bool opaque) {
 #ifdef QCOM_HARDWARE
     GLuint previousFbo;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, (GLint*) &previousFbo);
@@ -79,6 +86,20 @@ int LayerRenderer::prepareDirty(float left, float top, float right, float bottom
 #endif
 }
 
+status_t LayerRenderer::clear(float left, float top, float right, float bottom, bool opaque) {
+    if (mLayer->isDirty()) {
+        getCaches().disableScissor();
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        getCaches().resetScissor();
+        mLayer->setDirty(false);
+
+        return DrawGlInfo::kStatusDone;
+    }
+
+    return OpenGLRenderer::clear(left, top, right, bottom, opaque);
+}
+
 void LayerRenderer::finish() {
     OpenGLRenderer::finish();
 
@@ -94,6 +115,10 @@ GLint LayerRenderer::getTargetFbo() {
     return mLayer->getFbo();
 }
 
+bool LayerRenderer::suppressErrorChecks() {
+    return true;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Dirty region tracking
 ///////////////////////////////////////////////////////////////////////////////
@@ -103,14 +128,10 @@ bool LayerRenderer::hasLayer() {
 }
 
 Region* LayerRenderer::getRegion() {
-#if RENDER_LAYERS_AS_REGIONS
     if (getSnapshot()->flags & Snapshot::kFlagFboTarget) {
         return OpenGLRenderer::getRegion();
     }
     return &mLayer->region;
-#else
-    return OpenGLRenderer::getRegion();
-#endif
 }
 
 // TODO: This implementation is flawed and can generate T-junctions
@@ -121,7 +142,6 @@ Region* LayerRenderer::getRegion() {
 //       In practice, T-junctions do not appear often so this has yet
 //       to be fixed.
 void LayerRenderer::generateMesh() {
-#if RENDER_LAYERS_AS_REGIONS
     if (mLayer->region.isRect() || mLayer->region.isEmpty()) {
         if (mLayer->mesh) {
             delete mLayer->mesh;
@@ -188,7 +208,6 @@ void LayerRenderer::generateMesh() {
             indices[index + 5] = quad + 3;   // bottom-right
         }
     }
-#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -219,6 +238,7 @@ Layer* LayerRenderer::createLayer(uint32_t width, uint32_t height, bool isOpaque
     layer->setAlpha(255, SkXfermode::kSrcOver_Mode);
     layer->setBlend(!isOpaque);
     layer->setColorFilter(NULL);
+    layer->setDirty(true);
     layer->region.clear();
 
     GLuint previousFbo;
@@ -245,8 +265,7 @@ Layer* LayerRenderer::createLayer(uint32_t width, uint32_t height, bool isOpaque
 #endif
             caches.fboCache.put(fbo);
 
-            layer->deleteTexture();
-            delete layer;
+            Caches::getInstance().resourceCache.decrementRefcount(layer);
 
             return NULL;
         }
@@ -254,10 +273,6 @@ Layer* LayerRenderer::createLayer(uint32_t width, uint32_t height, bool isOpaque
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
             layer->getTexture(), 0);
-
-    glDisable(GL_SCISSOR_TEST);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glEnable(GL_SCISSOR_TEST);
 
     glBindFramebuffer(GL_FRAMEBUFFER, previousFbo);
 #ifdef QCOM_HARDWARE
@@ -276,8 +291,7 @@ bool LayerRenderer::resizeLayer(Layer* layer, uint32_t width, uint32_t height) {
             layer->texCoords.set(0.0f, height / float(layer->getHeight()),
                     width / float(layer->getWidth()), 0.0f);
         } else {
-            layer->deleteTexture();
-            delete layer;
+            Caches::getInstance().resourceCache.decrementRefcount(layer);
             return false;
         }
     }
@@ -342,13 +356,13 @@ void LayerRenderer::destroyLayer(Layer* layer) {
 
         if (!Caches::getInstance().layerCache.put(layer)) {
             LAYER_RENDERER_LOGD("  Destroyed!");
-            layer->deleteTexture();
-            delete layer;
+            Caches::getInstance().resourceCache.decrementRefcount(layer);
         } else {
             LAYER_RENDERER_LOGD("  Cached!");
 #if DEBUG_LAYER_RENDERER
             Caches::getInstance().layerCache.dump();
 #endif
+            layer->removeFbo();
             layer->region.clear();
         }
     }
@@ -371,10 +385,10 @@ void LayerRenderer::flushLayer(Layer* layer) {
         if (Caches::getInstance().extensions.hasDiscardFramebuffer()) {
             GLuint previousFbo;
             glGetIntegerv(GL_FRAMEBUFFER_BINDING, (GLint*) &previousFbo);
-
-            GLenum attachments = GL_COLOR_ATTACHMENT0;
             if (fbo != previousFbo) glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-            glDiscardFramebufferEXT(GL_FRAMEBUFFER, 1, &attachments);
+
+            const GLenum attachments[] = { GL_COLOR_ATTACHMENT0 };
+            glDiscardFramebufferEXT(GL_FRAMEBUFFER, 1, attachments);
 
             if (fbo != previousFbo) glBindFramebuffer(GL_FRAMEBUFFER, previousFbo);
         }
@@ -384,7 +398,7 @@ void LayerRenderer::flushLayer(Layer* layer) {
 
 bool LayerRenderer::copyLayer(Layer* layer, SkBitmap* bitmap) {
     Caches& caches = Caches::getInstance();
-    if (layer && layer->isTextureLayer() && bitmap->width() <= caches.maxTextureSize &&
+    if (layer && bitmap->width() <= caches.maxTextureSize &&
             bitmap->height() <= caches.maxTextureSize) {
 
         GLuint fbo = caches.fboCache.get();
@@ -397,6 +411,7 @@ bool LayerRenderer::copyLayer(Layer* layer, SkBitmap* bitmap) {
 
         GLuint texture;
         GLuint previousFbo;
+        GLuint previousViewport[4];
 
         GLenum format;
         GLenum type;
@@ -426,6 +441,7 @@ bool LayerRenderer::copyLayer(Layer* layer, SkBitmap* bitmap) {
 
         float alpha = layer->getAlpha();
         SkXfermode::Mode mode = layer->getMode();
+        GLuint previousLayerFbo = layer->getFbo();
 
         layer->setAlpha(255, SkXfermode::kSrc_Mode);
         layer->setFbo(fbo);
@@ -434,6 +450,7 @@ bool LayerRenderer::copyLayer(Layer* layer, SkBitmap* bitmap) {
 #ifdef QCOM_HARDWARE
         TILERENDERING_END(previousFbo, fbo);
 #endif
+        glGetIntegerv(GL_VIEWPORT, (GLint*) &previousViewport);
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 #ifdef QCOM_HARDWARE
         TILERENDERING_START(fbo, previousFbo, 0, 0, bitmap->width(), bitmap->height(),
@@ -444,6 +461,8 @@ bool LayerRenderer::copyLayer(Layer* layer, SkBitmap* bitmap) {
 
         caches.activeTexture(0);
         glBindTexture(GL_TEXTURE_2D, texture);
+
+        glPixelStorei(GL_PACK_ALIGNMENT, bitmap->bytesPerPixel());
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -465,7 +484,7 @@ bool LayerRenderer::copyLayer(Layer* layer, SkBitmap* bitmap) {
             renderer.OpenGLRenderer::prepareDirty(0.0f, 0.0f,
                     bitmap->width(), bitmap->height(), !layer->isBlend());
 
-            glDisable(GL_SCISSOR_TEST);
+            caches.disableScissor();
             renderer.translate(0.0f, bitmap->height());
             renderer.scale(1.0f, -1.0f);
 
@@ -494,8 +513,6 @@ bool LayerRenderer::copyLayer(Layer* layer, SkBitmap* bitmap) {
         }
 
 error:
-        glEnable(GL_SCISSOR_TEST);
-
 #if DEBUG_OPENGL
         if (error != GL_NO_ERROR) {
             ALOGD("GL error while copying layer into bitmap = 0x%x", error);
@@ -509,9 +526,11 @@ error:
         TILERENDERING_START(previousFbo, fbo);
 #endif
         layer->setAlpha(alpha, mode);
-        layer->setFbo(0);
+        layer->setFbo(previousLayerFbo);
         glDeleteTextures(1, &texture);
         caches.fboCache.put(fbo);
+        glViewport(previousViewport[0], previousViewport[1],
+                previousViewport[2], previousViewport[3]);
 
         return status;
     }

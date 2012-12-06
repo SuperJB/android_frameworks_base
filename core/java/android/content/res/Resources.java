@@ -89,7 +89,8 @@ public class Resources {
             = new LongSparseArray<ColorStateList>();
     private static final LongSparseArray<Drawable.ConstantState> sPreloadedColorDrawables
             = new LongSparseArray<Drawable.ConstantState>();
-    private static boolean mPreloaded;
+    private static boolean sPreloaded;
+    private static int sPreloadedDensity;
 
     /*package*/ final TypedValue mTmpValue = new TypedValue();
     /*package*/ final Configuration mTmpConfig = new Configuration();
@@ -693,9 +694,9 @@ public class Resources {
              */
             if (value.density > 0 && value.density != TypedValue.DENSITY_NONE) {
                 if (value.density == density) {
-                    value.density = DisplayMetrics.DENSITY_DEVICE;
+                    value.density = mMetrics.densityDpi;
                 } else {
-                    value.density = (value.density * DisplayMetrics.DENSITY_DEVICE) / density;
+                    value.density = (value.density * mMetrics.densityDpi) / density;
                 }
             }
 
@@ -1434,11 +1435,16 @@ public class Resources {
             int configChanges = 0xfffffff;
             if (config != null) {
                 mTmpConfig.setTo(config);
+                int density = config.densityDpi;
+                if (density == Configuration.DENSITY_DPI_UNDEFINED) {
+                    density = mMetrics.noncompatDensityDpi;
+                }
                 if (mCompatibilityInfo != null) {
-                    mCompatibilityInfo.applyToConfiguration(mTmpConfig);
+                    mCompatibilityInfo.applyToConfiguration(density, mTmpConfig);
                 }
                 if (mTmpConfig.locale == null) {
                     mTmpConfig.locale = Locale.getDefault();
+                    mTmpConfig.setLayoutDirection(mTmpConfig.locale);
                 }
                 configChanges = mConfiguration.updateFrom(mTmpConfig);
 
@@ -1453,6 +1459,11 @@ public class Resources {
             }
             if (mConfiguration.locale == null) {
                 mConfiguration.locale = Locale.getDefault();
+                mConfiguration.setLayoutDirection(mConfiguration.locale);
+            }
+            if (mConfiguration.densityDpi != Configuration.DENSITY_DPI_UNDEFINED) {
+                mMetrics.densityDpi = mConfiguration.densityDpi;
+                mMetrics.density = mConfiguration.densityDpi * DisplayMetrics.DENSITY_DEFAULT_SCALE;
             }
             mMetrics.scaledDensity = mMetrics.density * mConfiguration.fontScale;
 
@@ -1482,7 +1493,7 @@ public class Resources {
             mAssets.setConfiguration(mConfiguration.mcc, mConfiguration.mnc,
                     locale, mConfiguration.orientation,
                     mConfiguration.touchscreen,
-                    (int)(mMetrics.density*160), mConfiguration.keyboard,
+                    mConfiguration.densityDpi, mConfiguration.keyboard,
                     keyboardHidden, mConfiguration.navigation, width, height,
                     mConfiguration.smallestScreenWidthDp,
                     mConfiguration.screenWidthDp, mConfiguration.screenHeightDp,
@@ -1856,11 +1867,14 @@ public class Resources {
      */
     public final void startPreloading() {
         synchronized (mSync) {
-            if (mPreloaded) {
+            if (sPreloaded) {
                 throw new IllegalStateException("Resources already preloaded");
             }
-            mPreloaded = true;
+            sPreloaded = true;
             mPreloading = true;
+            sPreloadedDensity = DisplayMetrics.DENSITY_DEVICE;
+            mConfiguration.densityDpi = sPreloadedDensity;
+            updateConfiguration(null, null);
         }
     }
     
@@ -1875,9 +1889,23 @@ public class Resources {
         }
     }
 
-    /**
-     * @hide
-     */
+    private boolean verifyPreloadConfig(TypedValue value, String name) {
+        if ((value.changingConfigurations&~(ActivityInfo.CONFIG_FONT_SCALE
+                | ActivityInfo.CONFIG_DENSITY)) != 0) {
+            String resName;
+            try {
+                resName = getResourceName(value.resourceId);
+            } catch (NotFoundException e) {
+                resName = "?";
+            }
+            Log.w(TAG, "Preloaded " + name + " resource #0x"
+                    + Integer.toHexString(value.resourceId)
+                    + " (" + resName + ") that varies with configuration!!");
+            return false;
+        }
+        return true;
+    }
+
     public final void updateStringCache() {
         synchronized (mTmpValue) {
             mAssets.recreateStringBlocks();
@@ -1895,20 +1923,24 @@ public class Resources {
             }
         }
 
-        final long key = (((long) value.assetCookie) << 32) | value.data;
         boolean isColorDrawable = false;
         if (value.type >= TypedValue.TYPE_FIRST_COLOR_INT &&
                 value.type <= TypedValue.TYPE_LAST_COLOR_INT) {
             isColorDrawable = true;
         }
+        final long key = isColorDrawable ? value.data :
+                (((long) value.assetCookie) << 32) | value.data;
+
         Drawable dr = getCachedDrawable(isColorDrawable ? mColorDrawableCache : mDrawableCache, key);
 
         if (dr != null) {
             return dr;
         }
 
-        Drawable.ConstantState cs = isColorDrawable ?
-                sPreloadedColorDrawables.get(key) : sPreloadedDrawables.get(key);
+        Drawable.ConstantState cs = isColorDrawable
+                ? sPreloadedColorDrawables.get(key)
+                : (sPreloadedDensity == mConfiguration.densityDpi
+                        ? sPreloadedDrawables.get(key) : null);
         if (cs != null) {
             dr = cs.newDrawable(this);
         } else {
@@ -1976,10 +2008,12 @@ public class Resources {
             cs = dr.getConstantState();
             if (cs != null) {
                 if (mPreloading) {
-                    if (isColorDrawable) {
-                        sPreloadedColorDrawables.put(key, cs);
-                    } else {
-                        sPreloadedDrawables.put(key, cs);
+                    if (verifyPreloadConfig(value, "drawable")) {
+                        if (isColorDrawable) {
+                            sPreloadedColorDrawables.put(key, cs);
+                        } else {
+                            sPreloadedDrawables.put(key, cs);
+                        }
                     }
                 } else {
                     synchronized (mTmpValue) {
@@ -2044,7 +2078,9 @@ public class Resources {
 
             csl = ColorStateList.valueOf(value.data);
             if (mPreloading) {
-                sPreloadedColorStateLists.put(key, csl);
+                if (verifyPreloadConfig(value, "color")) {
+                    sPreloadedColorStateLists.put(key, csl);
+                }
             }
 
             return csl;
@@ -2088,7 +2124,9 @@ public class Resources {
 
         if (csl != null) {
             if (mPreloading) {
-                sPreloadedColorStateLists.put(key, csl);
+                if (verifyPreloadConfig(value, "color")) {
+                    sPreloadedColorStateLists.put(key, csl);
+                }
             } else {
                 synchronized (mTmpValue) {
                     //Log.i(TAG, "Saving cached color state list @ #" +

@@ -1,4 +1,3 @@
-
 package com.android.systemui.statusbar.policy;
 
 import android.content.BroadcastReceiver;

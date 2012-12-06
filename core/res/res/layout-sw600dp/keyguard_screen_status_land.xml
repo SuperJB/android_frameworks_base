@@ -23,7 +23,7 @@
         android:orientation="vertical"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:gravity="right">
+        android:gravity="end">
 
     <TextView
         android:id="@+id/carrier"
@@ -66,7 +66,7 @@
             android:textSize="@dimen/keyguard_pattern_unlock_clock_font_size"
             android:textAppearance="?android:attr/textAppearanceMedium"
             android:textColor="@color/lockscreen_clock_foreground"
-            android:layout_alignLeft="@id/timeDisplayBackground"
+            android:layout_alignStart="@id/timeDisplayBackground"
             android:layout_alignTop="@id/timeDisplayBackground"
             android:layout_marginBottom="6dip"
             />
@@ -91,34 +91,12 @@
             android:id="@+id/alarm_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="16dip"
+            android:layout_marginStart="16dip"
             android:textAppearance="?android:attr/textAppearanceMedium"
             android:drawablePadding="4dip"
             android:textSize="16sp"/>
 
     </LinearLayout>
-
-    <com.android.internal.policy.impl.WeatherText
-        android:id="@+id/weather"
-        android:layout_gravity="right"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dip"
-        android:gravity="right"
-        android:singleLine="true"
-        android:ellipsize="end"
-        android:textSize="16sp"
-        android:textAppearance="?android:attr/textAppearanceMedium" />
-
-    <ViewFlipper
-        android:id="@+id/calendar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:inAnimation="@anim/calendar_fadein"
-        android:outAnimation="@anim/calendar_fadeout"
-        android:layout_marginTop="10dip"
-        android:layout_gravity="right"
-        android:drawablePadding="4dip" />
 
     <!-- Status1 is generally battery status and informational messages -->
     <TextView
@@ -131,7 +109,7 @@
         />
 
     <TextView
-        android:id="@+id/propertyOf"
+        android:id="@+id/owner_info"
         android:lineSpacingExtra="8dip"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -143,7 +121,4 @@
         android:visibility="invisible"
         />
 
-    <include
-        layout="@layout/weatherpanel"
-        android:layout_gravity="right" />
 </LinearLayout>

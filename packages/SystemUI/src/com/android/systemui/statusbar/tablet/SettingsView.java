@@ -19,6 +19,7 @@ package com.android.systemui.statusbar.tablet;
 import android.app.StatusBarManager;
 import android.content.Context;
 import android.content.Intent;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.AttributeSet;
 import android.util.Slog;
@@ -55,6 +56,7 @@ public class SettingsView extends LinearLayout implements View.OnClickListener {
         final Context context = getContext();
 
         mBrightness = new BrightnessController(context,
+                (ImageView)findViewById(R.id.brightness_icon),
                 (ToggleSlider)findViewById(R.id.brightness));
         mDoNotDisturb = new DoNotDisturbController(context,
                 (CompoundButton)findViewById(R.id.do_not_disturb_checkbox));
@@ -79,12 +81,21 @@ public class SettingsView extends LinearLayout implements View.OnClickListener {
         return (StatusBarManager)getContext().getSystemService(Context.STATUS_BAR_SERVICE);
     }
 
+    // Network
+    // ----------------------------
+    private void onClickNetwork() {
+        getContext().startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)
+                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        getStatusBarManager().collapsePanels();
+    }
+
     // Settings
     // ----------------------------
     private void onClickSettings() {
-        getContext().startActivity(new Intent(Settings.ACTION_SETTINGS)
-                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        getStatusBarManager().collapse();
+        getContext().startActivityAsUser(new Intent(Settings.ACTION_SETTINGS)
+                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                new UserHandle(UserHandle.USER_CURRENT));
+        getStatusBarManager().collapsePanels();
     }
 }
 

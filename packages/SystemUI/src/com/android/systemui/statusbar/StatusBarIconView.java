@@ -27,6 +27,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.os.Handler;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -69,7 +70,7 @@ public class StatusBarIconView extends AnimatedImageView {
         mNumberPain.setTextSize(scaledPx);
         mNotification = notification;
         mShowNotificationCount = Settings.System.getInt(mContext.getContentResolver(),
-                Settings.System.STATUS_BAR_NOTIF_COUNT, 1) == 1;
+                Settings.System.STATUSBAR_NOTIF_COUNT, 0) == 1;
         setContentDescription(notification);
 
         SettingsObserver observer = new SettingsObserver(new Handler());
@@ -182,7 +183,12 @@ public class StatusBarIconView extends AnimatedImageView {
 
         if (icon.iconPackage != null) {
             try {
-                r = context.getPackageManager().getResourcesForApplication(icon.iconPackage);
+                int userId = icon.user.getIdentifier();
+                if (userId == UserHandle.USER_ALL) {
+                    userId = UserHandle.USER_OWNER;
+                }
+                r = context.getPackageManager()
+                        .getResourcesForApplicationAsUser(icon.iconPackage, userId);
             } catch (PackageManager.NameNotFoundException ex) {
                 Slog.e(TAG, "Icon package not found: " + icon.iconPackage);
                 return null;
@@ -294,25 +300,27 @@ public class StatusBarIconView extends AnimatedImageView {
             + " notification=" + mNotification + ")";
     }
 
-    class SettingsObserver extends ContentObserver {
+    class SettingsObserver extends ContentObserver {	
         SettingsObserver(Handler handler) {
-            super(handler);
+            super(handler);	
         }
-        void observe() {
-            mContext.getContentResolver().registerContentObserver(
-                    Settings.System.getUriFor(Settings.System.STATUS_BAR_NOTIF_COUNT),
+
+        void observe() {	
+            mContext.getContentResolver().registerContentObserver(	
+                    Settings.System.getUriFor(Settings.System.STATUSBAR_NOTIF_COUNT),	
                     false, this);
         }
+
         void unobserve() {
             mContext.getContentResolver().unregisterContentObserver(this);
         }
+
         @Override
         public void onChange(boolean selfChange) {
-            mShowNotificationCount = Settings.System.getInt(
+            mShowNotificationCount = Settings.System.getInt(	
                     mContext.getContentResolver(),
-                    Settings.System.STATUS_BAR_NOTIF_COUNT, 1) == 1;
-            set(mIcon, true);
+                    Settings.System.STATUSBAR_NOTIF_COUNT, 0) == 1;	
+            set(mIcon, true);	
         }
     }
-
 }

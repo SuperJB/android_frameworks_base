@@ -60,6 +60,9 @@ public class SignalClusterView
     private boolean showingWiFiText = false;
     private boolean showingAltCluster = false;
 
+    private boolean showingSignalText = false;
+    private boolean showingWiFiText = false;
+
     ViewGroup mWifiGroup, mMobileGroup;
     ImageView mWifi, mMobile, mWifiActivity, mMobileActivity, mMobileType, mAirplane;
     TextView mMobileText,mWiFiText;
@@ -274,6 +277,38 @@ public class SignalClusterView
                 Settings.System.STATUSBAR_WIFI_SIGNAL_TEXT, false);
         showingAltCluster = Settings.System.getBoolean(resolver,
                 Settings.System.STATUSBAR_SIGNAL_CLUSTER_ALT, clustdefault);
+        apply();
+    }
+
+    class SettingsObserver extends ContentObserver {
+        SettingsObserver(Handler handler) {
+            super(handler);
+        }
+
+        void observe() {
+            ContentResolver resolver = mContext.getContentResolver();
+            resolver.registerContentObserver(
+                    Settings.System.getUriFor(Settings.System.STATUSBAR_SIGNAL_TEXT), false,
+                    this);
+            resolver.registerContentObserver(
+                    Settings.System.getUriFor(Settings.System.STATUSBAR_WIFI_SIGNAL_TEXT), false,
+                    this);
+            updateSettings();
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            updateSettings();
+        }
+    }
+
+    protected void updateSettings() {
+        ContentResolver resolver = mContext.getContentResolver();
+
+        showingSignalText = Settings.System.getInt(resolver,
+                Settings.System.STATUSBAR_SIGNAL_TEXT, 0) != 0;
+        showingWiFiText = Settings.System.getInt(resolver,
+                Settings.System.STATUSBAR_WIFI_SIGNAL_TEXT, 0) != 0;
         apply();
     }
 }

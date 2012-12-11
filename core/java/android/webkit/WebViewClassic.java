@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2012 The Android Open Source Project
- * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -975,9 +974,9 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
     private int mTouchHighlightY;
     private boolean mShowTapHighlight;
 
-    // The HTML5VideoViewManager is used to tell the Video to update layer tree at
+    // Basically this proxy is used to tell the Video to update layer tree at
     // SetBaseLayer time and to pause when WebView paused.
-    private HTML5VideoViewManager mHTML5VideoViewManager;
+    private HTML5VideoViewProxy mHTML5VideoViewProxy;
 
     // If we are using a set picture, don't send view updates to webkit
     private boolean mBlockWebkitViewMessages = false;
@@ -1682,7 +1681,7 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         // Initially use a size of two, since the user is likely to only hold
         // down two keys at a time (shift + another key)
         mKeysPressed = new Vector<Integer>(2);
-        mHTML5VideoViewManager = null;
+        mHTML5VideoViewProxy = null ;
     }
 
     @Override
@@ -2141,10 +2140,6 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
             mSavePasswordDialog.dismiss();
             mSavePasswordDialog = null;
         }
-        if (mSavePasswordDialog != null) {
-            mSavePasswordDialog.dismiss();
-            mSavePasswordDialog = null;
-        }
         if (mWebViewCore != null) {
             // Tell WebViewCore to destroy itself
             synchronized (this) {
@@ -2528,8 +2523,6 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
 
     private void loadUrlImpl(String url, Map<String, String> extraHeaders) {
         switchOutDrawHistory();
-        if (mHTML5VideoViewManager != null)
-            mHTML5VideoViewManager.suspend();
         WebViewCore.GetUrlData arg = new WebViewCore.GetUrlData();
         arg.mUrl = url;
         arg.mExtraHeaders = extraHeaders;
@@ -2663,8 +2656,6 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
     public void reload() {
         clearHelpers();
         switchOutDrawHistory();
-        if (mHTML5VideoViewManager != null)
-            mHTML5VideoViewManager.suspend();
         mWebViewCore.sendMessage(EventHub.RELOAD);
     }
 
@@ -2744,8 +2735,6 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
 
     private void goBackOrForward(int steps, boolean ignoreSnapshot) {
         if (steps != 0) {
-            if (mHTML5VideoViewManager != null)
-                mHTML5VideoViewManager.suspend();
             clearHelpers();
             mWebViewCore.sendMessage(EventHub.GO_BACK_FORWARD, steps,
                     ignoreSnapshot ? 1 : 0);
@@ -3497,8 +3486,8 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
             mWebViewCore.sendMessage(EventHub.ON_PAUSE);
             // We want to pause the current playing video when switching out
             // from the current WebView/tab.
-            if (mHTML5VideoViewManager != null) {
-                mHTML5VideoViewManager.pauseAndDispatch();
+            if (mHTML5VideoViewProxy != null) {
+                mHTML5VideoViewProxy.pauseAndDispatch();
             }
             if (mNativeClass != 0) {
                 nativeSetPauseDrawing(mNativeClass, true);
@@ -4507,8 +4496,8 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
             mWebViewCore.resumeWebKitDraw();
         }
 
-        if (mHTML5VideoViewManager != null) {
-            mHTML5VideoViewManager.setBaseLayer(layer);
+        if (mHTML5VideoViewProxy != null) {
+            mHTML5VideoViewProxy.setBaseLayer(layer);
         }
     }
 
@@ -7433,8 +7422,8 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
                     break;
 
                 case EXIT_FULLSCREEN_VIDEO:
-                    if (mHTML5VideoViewManager != null) {
-                        mHTML5VideoViewManager.exitFullscreenVideo();
+                    if (mHTML5VideoViewProxy != null) {
+                        mHTML5VideoViewProxy.exitFullScreenVideo();
                     }
                     break;
 
@@ -8523,21 +8512,8 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
      *
      * only used by the Browser
      */
-    public void registerHTML5VideoViewProxy(HTML5VideoViewProxy proxy) {
-        if (mHTML5VideoViewManager == null)
-            mHTML5VideoViewManager = new HTML5VideoViewManager(this);
-        mHTML5VideoViewManager.registerProxy(proxy);
-    }
-
-    /**
-     * Clean up method for registerHTML5VideoViewProxy
-     *
-     * @hide only used by the Browser
-     */
-    public void unregisterHTML5VideoViewProxy(HTML5VideoViewProxy proxy) {
-        if (mHTML5VideoViewManager != null) {
-            mHTML5VideoViewManager.unregisterProxy(proxy);
-        }
+    public void setHTML5VideoViewProxy(HTML5VideoViewProxy proxy) {
+        mHTML5VideoViewProxy = proxy;
     }
 
     /**

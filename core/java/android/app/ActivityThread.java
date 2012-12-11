@@ -25,11 +25,10 @@ import android.content.ContentProvider;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.IContentProvider;
-import android.content.Intent;
 import android.content.IIntentReceiver;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.InstrumentationInfo;
 import android.content.pm.PackageInfo;
@@ -48,14 +47,13 @@ import android.database.sqlite.SQLiteDebug;
 import android.database.sqlite.SQLiteDebug.DbStats;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerGlobal;
 import android.net.IConnectivityManager;
 import android.net.Proxy;
 import android.net.ProxyProperties;
+import android.net.Uri;
 import android.opengl.GLUtils;
 import android.os.AsyncTask;
-import android.net.Uri;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Debug;
@@ -73,14 +71,14 @@ import android.os.ServiceManager;
 import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.SystemProperties;
-import android.text.TextUtils;
 import android.os.Trace;
 import android.os.UserHandle;
+import android.renderscript.RenderScript;
+import android.text.TextUtils;
 import android.util.AndroidRuntimeException;
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.Log;
-import android.util.LogPrinter;
 import android.util.PrintWriterPrinter;
 import android.util.Slog;
 import android.view.CompatibilityInfoHolder;
@@ -94,13 +92,14 @@ import android.view.ViewRootImpl;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
-import android.renderscript.RenderScript;
 
 import com.android.internal.app.IAssetRedirectionManager;
 import com.android.internal.os.BinderInternal;
 import com.android.internal.os.RuntimeInit;
 import com.android.internal.os.SamplingProfilerIntegration;
 import com.android.internal.util.Objects;
+
+import dalvik.system.CloseGuard;
 
 import org.apache.harmony.xnet.provider.jsse.OpenSSLSocketImpl;
 
@@ -111,7 +110,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.ref.WeakReference;
 import java.net.InetAddress;
-import java.security.Security;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -124,8 +122,6 @@ import java.util.regex.Pattern;
 import libcore.io.DropBox;
 import libcore.io.EventLogger;
 import libcore.io.IoUtils;
-
-import dalvik.system.CloseGuard;
 
 final class SuperNotCalledException extends AndroidRuntimeException {
     public SuperNotCalledException(String msg) {
@@ -1688,19 +1684,10 @@ public final class ActivityThread {
                 compInfo.applicationScale, compInfo.isThemeable);
         Resources r;
         synchronized (mPackages) {
-            // Resources is app scale dependent.
-            if (false) {
-                Slog.w(TAG, "getTopLevelResources: " + resDir + " / "
-                        + compInfo.applicationScale);
-            }
             WeakReference<Resources> wr = mActiveResources.get(key);
             r = wr != null ? wr.get() : null;
             //if (r != null) Slog.i(TAG, "isUpToDate " + resDir + ": " + r.getAssets().isUpToDate());
             if (r != null && r.getAssets().isUpToDate()) {
-                if (false) {
-                    Slog.w(TAG, "Returning cached resources " + r + " " + resDir
-                            + ": appScale=" + r.getCompatibilityInfo().applicationScale);
-                }
                 return r;
             }
         }
@@ -1717,14 +1704,6 @@ public final class ActivityThread {
         }
 
         /* Attach theme information to the resulting AssetManager when appropriate. */
-        Configuration config = getConfiguration();
-        if (compInfo.isThemeable && config != null) {
-            if (config.customTheme == null) {
-                config.customTheme = CustomTheme.getBootTheme();
-            }
-
-            if (!TextUtils.isEmpty(config.customTheme.getThemePackageName())) {
-                attachThemeAssets(assets, config.customTheme);
         Configuration themeConfig = getConfiguration();
         if (compInfo.isThemeable && themeConfig != null) {
             if (themeConfig.customTheme == null) {
@@ -1752,12 +1731,6 @@ public final class ActivityThread {
             config = getConfiguration();
         }
         r = new Resources(assets, dm, config, compInfo);
-        if (false) {
-            Slog.i(TAG, "Created app resources " + resDir + " " + r + ": "
-                    + r.getConfiguration() + " appScale="
-                    + r.getCompatibilityInfo().applicationScale);
-        }
-
         synchronized (mPackages) {
             WeakReference<Resources> wr = mActiveResources.get(key);
             Resources existing = wr != null ? wr.get() : null;
@@ -3369,8 +3342,6 @@ public final class ActivityThread {
             r.stopped = false;
         }
         if (r.activity.mDecor != null) {
-            if (false) Slog.v(
-                TAG, "Handle window " + r + " visibility: " + show);
             updateVisibility(r, show);
         }
     }
@@ -5192,11 +5163,6 @@ public final class ActivityThread {
         }
 
         AsyncTask.init();
-
-        if (false) {
-            Looper.myLooper().setMessageLogging(new
-                    LogPrinter(Log.DEBUG, "ActivityThread"));
-        }
 
         Looper.loop();
 

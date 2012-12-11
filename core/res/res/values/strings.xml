@@ -4023,4 +4023,6 @@
     <!-- In WiFi notification -->
     <string name="notify_turn_wifi_off_title">Turn Wi-Fi off</string>
 
+    <string name="weatherpanel_slash">.</string>
+    
 </resources>

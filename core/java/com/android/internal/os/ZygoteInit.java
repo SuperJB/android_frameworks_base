@@ -19,22 +19,18 @@ package com.android.internal.os;
 import static libcore.io.OsConstants.S_IRWXG;
 import static libcore.io.OsConstants.S_IRWXO;
 
-import android.content.pm.ActivityInfo;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
-import android.graphics.drawable.Drawable;
 import android.net.LocalServerSocket;
 import android.os.Debug;
 import android.os.Process;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.util.EventLog;
 import android.util.Log;
 
 import dalvik.system.VMRuntime;
 import dalvik.system.Zygote;
-
-import libcore.io.IoUtils;
-import libcore.io.Libcore;
 
 import java.io.BufferedReader;
 import java.io.FileDescriptor;
@@ -46,16 +42,15 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 
+import libcore.io.IoUtils;
+import libcore.io.Libcore;
+
 /**
- * Startup class for the zygote process.
- *
- * Pre-initializes some classes, and then waits for commands on a UNIX domain
- * socket. Based on these commands, forks off child processes that inherit
- * the initial state of the VM.
- *
- * Please see {@link ZygoteConnection.Arguments} for documentation on the
- * client protocol.
- *
+ * Startup class for the zygote process. Pre-initializes some classes, and then
+ * waits for commands on a UNIX domain socket. Based on these commands, forks
+ * off child processes that inherit the initial state of the VM. Please see
+ * {@link ZygoteConnection.Arguments} for documentation on the client protocol.
+ * 
  * @hide
  */
 public class ZygoteInit {
@@ -69,9 +64,9 @@ public class ZygoteInit {
 
     /** when preloading, GC after allocating this many bytes */
     private static final String heapgrowthlimit =
-                    SystemProperties.get("dalvik.vm.heapgrowthlimit", "16m");
+            SystemProperties.get("dalvik.vm.heapgrowthlimit", "16m");
     private static final int PRELOAD_GC_THRESHOLD = Integer.parseInt(
-                    heapgrowthlimit.substring(0, heapgrowthlimit.length()-1))*1024*1024/2;
+            heapgrowthlimit.substring(0, heapgrowthlimit.length() - 1)) * 1024 * 1024 / 2;
 
     public static final String USAGE_STRING =
             " <\"start-system-server\"|\"\" for startSystemServer>";
@@ -79,14 +74,14 @@ public class ZygoteInit {
     private static LocalServerSocket sServerSocket;
 
     /**
-     * Used to pre-load resources.  We hold a global reference on it so it
-     * never gets destroyed.
+     * Used to pre-load resources. We hold a global reference on it so it never
+     * gets destroyed.
      */
     private static Resources mResources;
 
     /**
-     * The number of times that the main Zygote loop
-     * should run before calling gc() again.
+     * The number of times that the main Zygote loop should run before calling
+     * gc() again.
      */
     static final int GC_LOOP_COUNT = 10;
 
@@ -105,10 +100,10 @@ public class ZygoteInit {
     private static final boolean PRELOAD_RESOURCES = false;
 
     /**
-     * Invokes a static "main(argv[]) method on class "className".
-     * Converts various failing exceptions into RuntimeExceptions, with
-     * the assumption that they will then cause the VM instance to exit.
-     *
+     * Invokes a static "main(argv[]) method on class "className". Converts
+     * various failing exceptions into RuntimeExceptions, with the assumption
+     * that they will then cause the VM instance to exit.
+     * 
      * @param loader class loader to use
      * @param className Fully-qualified class name
      * @param argv Argument vector for main()
@@ -128,7 +123,9 @@ public class ZygoteInit {
 
         Method m;
         try {
-            m = cl.getMethod("main", new Class[] { String[].class });
+            m = cl.getMethod("main", new Class[] {
+                String[].class
+            });
         } catch (NoSuchMethodException ex) {
             throw new RuntimeException(
                     "Missing static main on " + className, ex);
@@ -138,23 +135,22 @@ public class ZygoteInit {
         }
 
         int modifiers = m.getModifiers();
-        if (! (Modifier.isStatic(modifiers) && Modifier.isPublic(modifiers))) {
+        if (!(Modifier.isStatic(modifiers) && Modifier.isPublic(modifiers))) {
             throw new RuntimeException(
                     "Main method is not public and static on " + className);
         }
 
         /*
-         * This throw gets caught in ZygoteInit.main(), which responds
-         * by invoking the exception's run() method. This arrangement
-         * clears up all the stack frames that were required in setting
-         * up the process.
+         * This throw gets caught in ZygoteInit.main(), which responds by
+         * invoking the exception's run() method. This arrangement clears up all
+         * the stack frames that were required in setting up the process.
          */
         throw new ZygoteInit.MethodAndArgsCaller(m, argv);
     }
 
     /**
      * Registers a server socket for zygote command connections
-     *
+     * 
      * @throws RuntimeException when open fails
      */
     private static void registerZygoteSocket() {
@@ -192,8 +188,8 @@ public class ZygoteInit {
     }
 
     /**
-     * Close and clean up zygote sockets. Called on shutdown and on the
-     * child's exit path.
+     * Close and clean up zygote sockets. Called on shutdown and on the child's
+     * exit path.
      */
     static void closeServerSocket() {
         try {
@@ -239,11 +235,9 @@ public class ZygoteInit {
     }
 
     /**
-     * Performs Zygote process initialization. Loads and initializes
-     * commonly used classes.
-     *
-     * Most classes only cause a few hundred bytes to be allocated, but
-     * a few will allocate a dozen Kbytes (in one case, 500+K).
+     * Performs Zygote process initialization. Loads and initializes commonly
+     * used classes. Most classes only cause a few hundred bytes to be
+     * allocated, but a few will allocate a dozen Kbytes (in one case, 500+K).
      */
     private static void preloadClasses() {
         final VMRuntime runtime = VMRuntime.getRuntime();
@@ -260,19 +254,18 @@ public class ZygoteInit {
             setEffectiveGroup(UNPRIVILEGED_GID);
             setEffectiveUser(UNPRIVILEGED_UID);
 
-            // Alter the target heap utilization.  With explicit GCs this
+            // Alter the target heap utilization. With explicit GCs this
             // is not likely to have any effect.
             float defaultUtilization = runtime.getTargetHeapUtilization();
             runtime.setTargetHeapUtilization(0.8f);
 
             // Start with a clean slate.
             System.gc();
-            runtime.runFinalizationSync();
+            System.runFinalization();
             Debug.startAllocCounting();
 
             try {
-                BufferedReader br
-                    = new BufferedReader(new InputStreamReader(is), 256);
+                BufferedReader br = new BufferedReader(new InputStreamReader(is), 256);
 
                 int count = 0;
                 String line;
@@ -284,17 +277,10 @@ public class ZygoteInit {
                     }
 
                     try {
-                        if (false) {
-                            Log.v(TAG, "Preloading " + line + "...");
-                        }
                         Class.forName(line);
                         if (Debug.getGlobalAllocSize() > PRELOAD_GC_THRESHOLD) {
-                            if (false) {
-                                Log.v(TAG,
-                                    " GC at " + Debug.getGlobalAllocSize());
-                            }
                             System.gc();
-                            runtime.runFinalizationSync();
+                            System.runFinalization();
                             Debug.resetGlobalAllocSize();
                         }
                         count++;
@@ -313,7 +299,7 @@ public class ZygoteInit {
                 }
 
                 Log.i(TAG, "...preloaded " + count + " classes in "
-                        + (SystemClock.uptimeMillis()-startTime) + "ms.");
+                        + (SystemClock.uptimeMillis() - startTime) + "ms.");
             } catch (IOException e) {
                 Log.e(TAG, "Error reading " + PRELOADED_CLASSES + ".", e);
             } finally {
@@ -331,11 +317,9 @@ public class ZygoteInit {
     }
 
     /**
-     * Load in commonly used resources, so they can be shared across
-     * processes.
-     *
-     * These tend to be a few Kbytes, but are frequently in the 20-40K
-     * range, and occasionally even larger.
+     * Load in commonly used resources, so they can be shared across processes.
+     * These tend to be a few Kbytes, but are frequently in the 20-40K range,
+     * and occasionally even larger.
      */
     private static void preloadResources() {
         final VMRuntime runtime = VMRuntime.getRuntime();
@@ -343,7 +327,7 @@ public class ZygoteInit {
         Debug.startAllocCounting();
         try {
             System.gc();
-            runtime.runFinalizationSync();
+            System.runFinalization();
             mResources = Resources.getSystem();
             mResources.startPreloading();
             if (PRELOAD_RESOURCES) {
@@ -355,7 +339,7 @@ public class ZygoteInit {
                 int N = preloadDrawables(runtime, ar);
                 ar.recycle();
                 Log.i(TAG, "...preloaded " + N + " resources in "
-                        + (SystemClock.uptimeMillis()-startTime) + "ms.");
+                        + (SystemClock.uptimeMillis() - startTime) + "ms.");
 
                 startTime = SystemClock.uptimeMillis();
                 ar = mResources.obtainTypedArray(
@@ -363,7 +347,7 @@ public class ZygoteInit {
                 N = preloadColorStateLists(runtime, ar);
                 ar.recycle();
                 Log.i(TAG, "...preloaded " + N + " resources in "
-                        + (SystemClock.uptimeMillis()-startTime) + "ms.");
+                        + (SystemClock.uptimeMillis() - startTime) + "ms.");
             } else {
                 Log.i(TAG, "Preload resources disabled, skipped.");
             }
@@ -377,53 +361,40 @@ public class ZygoteInit {
 
     private static int preloadColorStateLists(VMRuntime runtime, TypedArray ar) {
         int N = ar.length();
-        for (int i=0; i<N; i++) {
+        for (int i = 0; i < N; i++) {
             if (Debug.getGlobalAllocSize() > PRELOAD_GC_THRESHOLD) {
-                if (false) {
-                    Log.v(TAG, " GC at " + Debug.getGlobalAllocSize());
-                }
                 System.gc();
-                runtime.runFinalizationSync();
+                System.runFinalization();
                 Debug.resetGlobalAllocSize();
             }
             int id = ar.getResourceId(i, 0);
-            if (false) {
-                Log.v(TAG, "Preloading resource #" + Integer.toHexString(id));
-            }
             if (id != 0) {
                 if (mResources.getColorStateList(id) == null) {
                     throw new IllegalArgumentException(
                             "Unable to find preloaded color resource #0x"
-                            + Integer.toHexString(id)
-                            + " (" + ar.getString(i) + ")");
+                                    + Integer.toHexString(id)
+                                    + " (" + ar.getString(i) + ")");
                 }
             }
         }
         return N;
     }
 
-
     private static int preloadDrawables(VMRuntime runtime, TypedArray ar) {
         int N = ar.length();
-        for (int i=0; i<N; i++) {
+        for (int i = 0; i < N; i++) {
             if (Debug.getGlobalAllocSize() > PRELOAD_GC_THRESHOLD) {
-                if (false) {
-                    Log.v(TAG, " GC at " + Debug.getGlobalAllocSize());
-                }
                 System.gc();
-                runtime.runFinalizationSync();
+                System.runFinalization();
                 Debug.resetGlobalAllocSize();
             }
             int id = ar.getResourceId(i, 0);
-            if (false) {
-                Log.v(TAG, "Preloading resource #" + Integer.toHexString(id));
-            }
             if (id != 0) {
                 if (mResources.getDrawable(id) == null) {
                     throw new IllegalArgumentException(
                             "Unable to find preloaded drawable resource #0x"
-                            + Integer.toHexString(id)
-                            + " (" + ar.getString(i) + ")");
+                                    + Integer.toHexString(id)
+                                    + " (" + ar.getString(i) + ")");
                 }
             }
         }
@@ -431,22 +402,22 @@ public class ZygoteInit {
     }
 
     /**
-     * Runs several special GCs to try to clean up a few generations of
-     * softly- and final-reachable objects, along with any other garbage.
-     * This is only useful just before a fork().
+     * Runs several special GCs to try to clean up a few generations of softly-
+     * and final-reachable objects, along with any other garbage. This is only
+     * useful just before a fork().
      */
-    /*package*/ static void gc() {
-        final VMRuntime runtime = VMRuntime.getRuntime();
+    /* package */static void gc() {
 
-        /* runFinalizationSync() lets finalizers be called in Zygote,
-         * which doesn't have a HeapWorker thread.
+        /*
+         * runFinalization() lets finalizers be called in Zygote, which doesn't
+         * have a HeapWorker thread.
          */
         System.gc();
-        runtime.runFinalizationSync();
+        System.runFinalization();
         System.gc();
-        runtime.runFinalizationSync();
+        System.runFinalization();
         System.gc();
-        runtime.runFinalizationSync();
+        System.runFinalization();
     }
 
     /**
@@ -458,7 +429,8 @@ public class ZygoteInit {
 
         closeServerSocket();
 
-        // set umask to 0077 so new files and directories will default to owner-only permissions.
+        // set umask to 0077 so new files and directories will default to
+        // owner-only permissions.
         Libcore.os.umask(S_IRWXG | S_IRWXO);
 
         if (parsedArgs.niceName != null) {
@@ -486,13 +458,13 @@ public class ZygoteInit {
             throws MethodAndArgsCaller, RuntimeException {
         /* Hardcoded command line to start the system server */
         String args[] = {
-            "--setuid=1000",
-            "--setgid=1000",
-            "--setgroups=1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,1018,3001,3002,3003,3006,3007,3008",
-            "--capabilities=130104352,130104352",
-            "--runtime-init",
-            "--nice-name=system_server",
-            "com.android.server.SystemServer",
+                "--setuid=1000",
+                "--setgid=1000",
+                "--setgroups=1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,1018,3001,3002,3003,3006,3007,3008",
+                "--capabilities=130104352,130104352",
+                "--runtime-init",
+                "--nice-name=system_server",
+                "com.android.server.SystemServer",
         };
         ZygoteConnection.Arguments parsedArgs = null;
 
@@ -530,10 +502,10 @@ public class ZygoteInit {
 
             registerZygoteSocket();
             EventLog.writeEvent(LOG_BOOT_PROGRESS_PRELOAD_START,
-                SystemClock.uptimeMillis());
+                    SystemClock.uptimeMillis());
             preload();
             EventLog.writeEvent(LOG_BOOT_PROGRESS_PRELOAD_END,
-                SystemClock.uptimeMillis());
+                    SystemClock.uptimeMillis());
 
             // Finish profiling the zygote initialization.
             SamplingProfilerIntegration.writeZygoteSnapshot();
@@ -571,12 +543,11 @@ public class ZygoteInit {
     }
 
     /**
-     * Runs the zygote in accept-and-fork mode. In this mode, each peer
-     * gets its own zygote spawner process. This code is retained for
-     * reference only.
-     *
-     * @throws MethodAndArgsCaller in a child process when a main() should
-     * be executed.
+     * Runs the zygote in accept-and-fork mode. In this mode, each peer gets its
+     * own zygote spawner process. This code is retained for reference only.
+     * 
+     * @throws MethodAndArgsCaller in a child process when a main() should be
+     *             executed.
      */
     private static void runForkMode() throws MethodAndArgsCaller {
         while (true) {
@@ -609,12 +580,12 @@ public class ZygoteInit {
     }
 
     /**
-     * Runs the zygote process's select loop. Accepts new connections as
-     * they happen, and reads commands from connections one spawn-request's
-     * worth at a time.
-     *
-     * @throws MethodAndArgsCaller in a child process when a main() should
-     * be executed.
+     * Runs the zygote process's select loop. Accepts new connections as they
+     * happen, and reads commands from connections one spawn-request's worth at
+     * a time.
+     * 
+     * @throws MethodAndArgsCaller in a child process when a main() should be
+     *             executed.
      */
     private static void runSelectLoopMode() throws MethodAndArgsCaller {
         ArrayList<FileDescriptor> fds = new ArrayList();
@@ -629,13 +600,11 @@ public class ZygoteInit {
             int index;
 
             /*
-             * Call gc() before we block in select().
-             * It's work that has to be done anyway, and it's better
-             * to avoid making every child do it.  It will also
-             * madvise() any free memory as a side-effect.
-             *
-             * Don't call it every time, because walking the entire
-             * heap is a lot of overhead to free a few hundred bytes.
+             * Call gc() before we block in select(). It's work that has to be
+             * done anyway, and it's better to avoid making every child do it.
+             * It will also madvise() any free memory as a side-effect. Don't
+             * call it every time, because walking the entire heap is a lot of
+             * overhead to free a few hundred bytes.
              */
             if (loopCount <= 0) {
                 gc();
@@ -643,7 +612,6 @@ public class ZygoteInit {
             } else {
                 loopCount--;
             }
-
 
             try {
                 fdArray = fds.toArray(fdArray);
@@ -672,6 +640,7 @@ public class ZygoteInit {
 
     /**
      * The Linux syscall "setreuid()"
+     * 
      * @param ruid real uid
      * @param euid effective uid
      * @return 0 on success, non-zero errno on fail
@@ -680,6 +649,7 @@ public class ZygoteInit {
 
     /**
      * The Linux syscall "setregid()"
+     * 
      * @param rgid real gid
      * @param egid effective gid
      * @return 0 on success, non-zero errno on fail
@@ -688,7 +658,7 @@ public class ZygoteInit {
 
     /**
      * Invokes the linux syscall "setpgid"
-     *
+     * 
      * @param pid pid to change
      * @param pgid new process group of pid
      * @return 0 on success or non-zero errno on fail
@@ -697,7 +667,7 @@ public class ZygoteInit {
 
     /**
      * Invokes the linux syscall "getpgid"
-     *
+     * 
      * @param pid pid to query
      * @return pgid of pid in question
      * @throws IOException on error
@@ -705,12 +675,12 @@ public class ZygoteInit {
     static native int getpgid(int pid) throws IOException;
 
     /**
-     * Invokes the syscall dup2() to copy the specified descriptors into
-     * stdin, stdout, and stderr. The existing stdio descriptors will be
-     * closed and errors during close will be ignored. The specified
-     * descriptors will also remain open at their original descriptor numbers,
-     * so the caller may want to close the original descriptors.
-     *
+     * Invokes the syscall dup2() to copy the specified descriptors into stdin,
+     * stdout, and stderr. The existing stdio descriptors will be closed and
+     * errors during close will be ignored. The specified descriptors will also
+     * remain open at their original descriptor numbers, so the caller may want
+     * to close the original descriptors.
+     * 
      * @param in new stdin
      * @param out new stdout
      * @param err new stderr
@@ -721,7 +691,7 @@ public class ZygoteInit {
 
     /**
      * Toggles the close-on-exec flag for the specified file descriptor.
-     *
+     * 
      * @param fd non-null; file descriptor
      * @param flag desired close-on-exec flag state
      * @throws IOException
@@ -731,7 +701,7 @@ public class ZygoteInit {
 
     /**
      * Retrieves the permitted capability set from another process.
-     *
+     * 
      * @param pid &gt;=0 process ID or 0 for this process
      * @throws IOException on error
      */
@@ -740,7 +710,7 @@ public class ZygoteInit {
 
     /**
      * Sets the permitted and effective capability sets of this process.
-     *
+     * 
      * @param permittedCapabilities permitted set
      * @param effectiveCapabilities effective set
      * @throws IOException on error
@@ -750,9 +720,9 @@ public class ZygoteInit {
             long effectiveCapabilities) throws IOException;
 
     /**
-     * Invokes select() on the provider array of file descriptors (selecting
-     * for readability only). Array elements of null are ignored.
-     *
+     * Invokes select() on the provider array of file descriptors (selecting for
+     * readability only). Array elements of null are ignored.
+     * 
      * @param fds non-null; array of readable file descriptors
      * @return index of descriptor that is now readable or -1 for empty array.
      * @throws IOException if an error occurs
@@ -761,7 +731,7 @@ public class ZygoteInit {
 
     /**
      * Creates a file descriptor from an int fd.
-     *
+     * 
      * @param fd integer OS file descriptor
      * @return non-null; FileDescriptor instance
      * @throws IOException if fd is invalid
@@ -776,9 +746,9 @@ public class ZygoteInit {
     }
 
     /**
-     * Helper exception class which holds a method and arguments and
-     * can call them. This is used as part of a trampoline to get rid of
-     * the initial process setup stack frames.
+     * Helper exception class which holds a method and arguments and can call
+     * them. This is used as part of a trampoline to get rid of the initial
+     * process setup stack frames.
      */
     public static class MethodAndArgsCaller extends Exception
             implements Runnable {
@@ -795,7 +765,9 @@ public class ZygoteInit {
 
         public void run() {
             try {
-                mMethod.invoke(null, new Object[] { mArgs });
+                mMethod.invoke(null, new Object[] {
+                    mArgs
+                });
             } catch (IllegalAccessException ex) {
                 throw new RuntimeException(ex);
             } catch (InvocationTargetException ex) {

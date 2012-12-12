@@ -672,16 +672,6 @@ public class TelephonyManager {
     /**
      * @hide
      */
-    public void toggle2G(boolean twoGees) {
-        try {
-            getITelephony().toggle2G(twoGees);
-        } catch (RemoteException e) {
-        }
-    }
-
-    /**
-     * @hide
-     */
     public void toggleLTE(boolean lte) {
         try {
             getITelephony().toggleLTE(lte);

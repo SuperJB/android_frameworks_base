@@ -669,16 +669,6 @@ public class TelephonyManager {
         return getNetworkTypeName(getNetworkType());
     }
 
-    /**
-     * @hide
-     */
-    public void toggleLTE(boolean lte) {
-        try {
-            getITelephony().toggleLTE(lte);
-        } catch (RemoteException e) {
-        }
-    }
-
     /** {@hide} */
     public static String getNetworkTypeName(int type) {
         switch (type) {

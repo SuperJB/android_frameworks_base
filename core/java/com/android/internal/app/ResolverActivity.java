@@ -35,10 +35,8 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PatternMatcher;
-import android.os.Process;
 import android.os.RemoteException;
 import android.os.UserHandle;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -46,7 +44,6 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.ListView;
@@ -62,7 +59,7 @@ import java.util.Set;
 /**
  * This activity is displayed when the system attempts to start an Intent for
  * which there is more than one matching activity, allowing the user to decide
- * which to go to.  It is not normally used directly by application developers.
+ * which to go to. It is not normally used directly by application developers.
  */
 public class ResolverActivity extends AlertActivity implements AdapterView.OnItemClickListener {
     private static final String TAG = "ResolverActivity";
@@ -75,16 +72,15 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
     private GridView mGrid;
     private Button mAlwaysButton;
     private Button mOnceButton;
-    private CheckBox mAlwaysCheckBox;
     private int mIconDpi;
     private int mIconSize;
     private int mMaxColumns;
     private int mLastSelected = GridView.INVALID_POSITION;
 
     private boolean mRegistered;
-    private boolean mUseAltGrid;
     private final PackageMonitor mPackageMonitor = new PackageMonitor() {
-        @Override public void onSomePackagesChanged() {
+        @Override
+        public void onSomePackagesChanged() {
             mAdapter.handlePackagesChanged();
         }
     };
@@ -93,10 +89,10 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
         Intent intent = new Intent(getIntent());
         // The resolver activity is set to be hidden from recent tasks.
         // we don't want this attribute to be propagated to the next activity
-        // being launched.  Note that if the original Intent also had this
-        // flag set, we are now losing it.  That should be a very rare case
+        // being launched. Note that if the original Intent also had this
+        // flag set, we are now losing it. That should be a very rare case
         // and we can live with this.
-        intent.setFlags(intent.getFlags()&~Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+        intent.setFlags(intent.getFlags() & ~Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
         return intent;
     }
 
@@ -118,7 +114,6 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
         } catch (RemoteException e) {
             mLaunchedFromUid = -1;
         }
-        mUseAltGrid = Settings.System.getBoolean(getContentResolver(), Settings.System.ACTIVITY_RESOLVER_USE_ALT, false);
         mPm = getPackageManager();
         mAlwaysUseOption = alwaysUseOption;
         mMaxColumns = getResources().getInteger(R.integer.config_maxResolverActivityColumns);
@@ -143,11 +138,7 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
             finish();
             return;
         } else if (count > 1) {
-            if (mUseAltGrid) {
-                ap.mView = getLayoutInflater().inflate(R.layout.resolver_grid_alt, null);
-            } else {
-                ap.mView = getLayoutInflater().inflate(R.layout.resolver_grid, null);
-            }
+            ap.mView = getLayoutInflater().inflate(R.layout.resolver_grid, null);
             mGrid = (GridView) ap.mView.findViewById(R.id.resolver_grid);
             mGrid.setAdapter(mAdapter);
             mGrid.setOnItemClickListener(this);
@@ -174,12 +165,8 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
             final ViewGroup buttonLayout = (ViewGroup) findViewById(R.id.button_bar);
             if (buttonLayout != null) {
                 buttonLayout.setVisibility(View.VISIBLE);
-                if (mUseAltGrid) {
-                    mAlwaysCheckBox = (CheckBox) buttonLayout.findViewById(R.id.checkbox_always);
-                } else {
-                    mAlwaysButton = (Button) buttonLayout.findViewById(R.id.button_always);
-                    mOnceButton = (Button) buttonLayout.findViewById(R.id.button_once);
-                }
+                mAlwaysButton = (Button) buttonLayout.findViewById(R.id.button_always);
+                mOnceButton = (Button) buttonLayout.findViewById(R.id.button_once);
             } else {
                 mAlwaysUseOption = false;
             }
@@ -241,9 +228,9 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
             mPackageMonitor.unregister();
             mRegistered = false;
         }
-        if ((getIntent().getFlags()&Intent.FLAG_ACTIVITY_NEW_TASK) != 0) {
+        if ((getIntent().getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) != 0) {
             // This resolver is in the unusual situation where it has been
-            // launched at the top of a new task.  We don't let it be added
+            // launched at the top of a new task. We don't let it be added
             // to the recent tasks shown to the user, and we need to make sure
             // that each time we are launched we get the correct launching
             // uid (not re-using the same resolver from an old launching uid),
@@ -262,10 +249,8 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
             final int checkedPos = mGrid.getCheckedItemPosition();
             final boolean enabled = checkedPos != GridView.INVALID_POSITION;
             mLastSelected = checkedPos;
-            if (!mUseAltGrid) {
-                mAlwaysButton.setEnabled(enabled);
-                mOnceButton.setEnabled(enabled);
-            }
+            mAlwaysButton.setEnabled(enabled);
+            mOnceButton.setEnabled(enabled);
             if (enabled) {
                 mGrid.setSelection(checkedPos);
             }
@@ -277,16 +262,10 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
         final int checkedPos = mGrid.getCheckedItemPosition();
         final boolean hasValidSelection = checkedPos != GridView.INVALID_POSITION;
         if (mAlwaysUseOption && (!hasValidSelection || mLastSelected != checkedPos)) {
-            if (!mUseAltGrid) {
-                mAlwaysButton.setEnabled(hasValidSelection);
-                mOnceButton.setEnabled(hasValidSelection);
-            }
+            mAlwaysButton.setEnabled(hasValidSelection);
+            mOnceButton.setEnabled(hasValidSelection);
             if (hasValidSelection) {
-                if (mUseAltGrid) {
-                    startSelected(position, mAlwaysCheckBox.isChecked());
-                } else {
-                    mGrid.smoothScrollToPosition(checkedPos);
-                }
+                mGrid.smoothScrollToPosition(checkedPos);
             }
             mLastSelected = checkedPos;
         } else {
@@ -323,7 +302,7 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
             }
             filter.addCategory(Intent.CATEGORY_DEFAULT);
 
-            int cat = ri.match&IntentFilter.MATCH_CATEGORY_MASK;
+            int cat = ri.match & IntentFilter.MATCH_CATEGORY_MASK;
             Uri data = intent.getData();
             if (cat == IntentFilter.MATCH_CATEGORY_TYPE) {
                 String mimeType = intent.resolveType(this);
@@ -342,9 +321,9 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
                 // or "content:" schemes (see IntentFilter for the reason).
                 if (cat != IntentFilter.MATCH_CATEGORY_TYPE
                         || (!"file".equals(data.getScheme())
-                                && !"content".equals(data.getScheme()))) {
+                        && !"content".equals(data.getScheme()))) {
                     filter.addDataScheme(data.getScheme());
-    
+
                     // Look through the resolved filter to determine which part
                     // of it matched the original Intent.
                     Iterator<IntentFilter.AuthorityEntry> aIt = ri.filter.authoritiesIterator();
@@ -377,11 +356,12 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
                 final int N = mAdapter.mList.size();
                 ComponentName[] set = new ComponentName[N];
                 int bestMatch = 0;
-                for (int i=0; i<N; i++) {
+                for (int i = 0; i < N; i++) {
                     ResolveInfo r = mAdapter.mList.get(i).ri;
                     set[i] = new ComponentName(r.activityInfo.packageName,
                             r.activityInfo.name);
-                    if (r.match > bestMatch) bestMatch = r.match;
+                    if (r.match > bestMatch)
+                        bestMatch = r.match;
                 }
                 getPackageManager().addPreferredActivity(filter, bestMatch, set,
                         intent.getComponent());
@@ -433,7 +413,7 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
             mInitialIntents = initialIntents;
             mBaseResolveList = rList;
             mLaunchedFromUid = launchedFromUid;
-            mInflater = (LayoutInflater)context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+            mInflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
             rebuildList();
         }
 
@@ -442,7 +422,7 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
             rebuildList();
             notifyDataSetChanged();
             if (mList.size() <= 0) {
-                // We no longer have any items...  just finish the activity.
+                // We no longer have any items... just finish the activity.
                 finish();
             }
 
@@ -458,14 +438,15 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
             } else {
                 mCurrentResolveList = mPm.queryIntentActivities(
                         mIntent, PackageManager.MATCH_DEFAULT_ONLY
-                        | (mAlwaysUseOption ? PackageManager.GET_RESOLVED_FILTER : 0));
+                                | (mAlwaysUseOption ? PackageManager.GET_RESOLVED_FILTER : 0));
                 // Filter out any activities that the launched uid does not
-                // have permission for.  We don't do this when we have an explicit
+                // have permission for. We don't do this when we have an
+                // explicit
                 // list of resolved activities, because that only happens when
                 // we are being subclassed, so we can safely launch whatever
                 // they gave us.
                 if (mCurrentResolveList != null) {
-                    for (int i=mCurrentResolveList.size()-1; i >= 0; i--) {
+                    for (int i = mCurrentResolveList.size() - 1; i >= 0; i--) {
                         ActivityInfo ai = mCurrentResolveList.get(i).activityInfo;
                         int granted = ActivityManager.checkComponentPermission(
                                 ai.permission, mLaunchedFromUid,
@@ -482,16 +463,10 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
                 // Only display the first matches that are either of equal
                 // priority or have asked to be default options.
                 ResolveInfo r0 = mCurrentResolveList.get(0);
-                for (int i=1; i<N; i++) {
+                for (int i = 1; i < N; i++) {
                     ResolveInfo ri = mCurrentResolveList.get(i);
-                    if (false) Log.v(
-                        "ResolveListActivity",
-                        r0.activityInfo.name + "=" +
-                        r0.priority + "/" + r0.isDefault + " vs " +
-                        ri.activityInfo.name + "=" +
-                        ri.priority + "/" + ri.isDefault);
-                   if (r0.priority != ri.priority ||
-                        r0.isDefault != ri.isDefault) {
+                    if (r0.priority != ri.priority ||
+                            r0.isDefault != ri.isDefault) {
                         while (i < N) {
                             mCurrentResolveList.remove(i);
                             N--;
@@ -503,12 +478,12 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
                             new ResolveInfo.DisplayNameComparator(mPm);
                     Collections.sort(mCurrentResolveList, rComparator);
                 }
-                
+
                 mList = new ArrayList<DisplayResolveInfo>();
-                
+
                 // First put the initial items at the top.
                 if (mInitialIntents != null) {
-                    for (int i=0; i<mInitialIntents.length; i++) {
+                    for (int i = 0; i < mInitialIntents.length; i++) {
                         Intent ii = mInitialIntents[i];
                         if (ii == null) {
                             continue;
@@ -523,7 +498,7 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
                         ResolveInfo ri = new ResolveInfo();
                         ri.activityInfo = ai;
                         if (ii instanceof LabeledIntent) {
-                            LabeledIntent li = (LabeledIntent)ii;
+                            LabeledIntent li = (LabeledIntent) ii;
                             ri.resolvePackageName = li.getSourcePackage();
                             ri.labelRes = li.getLabelResource();
                             ri.nonLocalizedLabel = li.getNonLocalizedLabel();
@@ -533,12 +508,13 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
                                 ri.loadLabel(getPackageManager()), null, ii));
                     }
                 }
-                
-                // Check for applications with same name and use application name or
+
+                // Check for applications with same name and use application
+                // name or
                 // package name if necessary
                 r0 = mCurrentResolveList.get(0);
                 int start = 0;
-                CharSequence r0Label =  r0.loadLabel(mPm);
+                CharSequence r0Label = r0.loadLabel(mPm);
                 mShowExtended = false;
                 for (int i = 1; i < N; i++) {
                     if (r0Label == null) {
@@ -552,20 +528,20 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
                     if (riLabel.equals(r0Label)) {
                         continue;
                     }
-                    processGroup(mCurrentResolveList, start, (i-1), r0, r0Label);
+                    processGroup(mCurrentResolveList, start, (i - 1), r0, r0Label);
                     r0 = ri;
                     r0Label = riLabel;
                     start = i;
                 }
                 // Process last group
-                processGroup(mCurrentResolveList, start, (N-1), r0, r0Label);
+                processGroup(mCurrentResolveList, start, (N - 1), r0, r0Label);
             }
         }
 
         private void processGroup(List<ResolveInfo> rList, int start, int end, ResolveInfo ro,
                 CharSequence roLabel) {
             // Process labels from start to i
-            int num = end - start+1;
+            int num = end - start + 1;
             if (num == 1) {
                 // No duplicate labels. Use label for entry at start
                 mList.add(new DisplayResolveInfo(ro, roLabel, null, null));
@@ -579,12 +555,12 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
                 if (!usePkg) {
                     // Use HashSet to track duplicates
                     HashSet<CharSequence> duplicates =
-                        new HashSet<CharSequence>();
+                            new HashSet<CharSequence>();
                     duplicates.add(startApp);
-                    for (int j = start+1; j <= end ; j++) {
+                    for (int j = start + 1; j <= end; j++) {
                         ResolveInfo jRi = rList.get(j);
                         CharSequence jApp = jRi.activityInfo.applicationInfo.loadLabel(mPm);
-                        if ( (jApp == null) || (duplicates.contains(jApp))) {
+                        if ((jApp == null) || (duplicates.contains(jApp))) {
                             usePkg = true;
                             break;
                         } else {
@@ -597,7 +573,8 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
                 for (int k = start; k <= end; k++) {
                     ResolveInfo add = rList.get(k);
                     if (usePkg) {
-                        // Use application name for all entries from start to end-1
+                        // Use application name for all entries from start to
+                        // end-1
                         mList.add(new DisplayResolveInfo(add, roLabel,
                                 add.activityInfo.packageName, null));
                     } else {
@@ -623,11 +600,11 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
             }
 
             DisplayResolveInfo dri = mList.get(position);
-            
+
             Intent intent = new Intent(dri.origIntent != null
                     ? dri.origIntent : mIntent);
             intent.addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT
-                    |Intent.FLAG_ACTIVITY_PREVIOUS_IS_TOP);
+                    | Intent.FLAG_ACTIVITY_PREVIOUS_IS_TOP);
             ActivityInfo ai = dri.ri.activityInfo;
             intent.setComponent(new ComponentName(
                     ai.applicationInfo.packageName, ai.name));
@@ -653,7 +630,7 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
                         com.android.internal.R.layout.resolve_list_item, parent, false);
 
                 // Fix the icon size even if we have different sized resources
-                ImageView icon = (ImageView)view.findViewById(R.id.icon);
+                ImageView icon = (ImageView) view.findViewById(R.id.icon);
                 ViewGroup.LayoutParams lp = (ViewGroup.LayoutParams) icon.getLayoutParams();
                 lp.width = lp.height = mIconSize;
             } else {
@@ -664,9 +641,9 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
         }
 
         private final void bindView(View view, DisplayResolveInfo info) {
-            TextView text = (TextView)view.findViewById(com.android.internal.R.id.text1);
-            TextView text2 = (TextView)view.findViewById(com.android.internal.R.id.text2);
-            ImageView icon = (ImageView)view.findViewById(R.id.icon);
+            TextView text = (TextView) view.findViewById(com.android.internal.R.id.text1);
+            TextView text2 = (TextView) view.findViewById(com.android.internal.R.id.text2);
+            ImageView icon = (ImageView) view.findViewById(R.id.icon);
             text.setText(info.displayLabel);
             if (mShowExtended) {
                 text2.setVisibility(View.VISIBLE);
@@ -692,4 +669,3 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
 
     }
 }
-

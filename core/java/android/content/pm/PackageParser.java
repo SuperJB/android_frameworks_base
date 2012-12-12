@@ -25,7 +25,6 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.content.res.XmlResourceParser;
-import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PatternMatcher;
@@ -36,6 +35,11 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.Slog;
 import android.util.TypedValue;
+
+import com.android.internal.util.XmlUtils;
+
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -59,11 +63,6 @@ import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
-
-import com.android.internal.util.XmlUtils;
-
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
 
 /**
  * Package archive parsing
@@ -256,17 +255,6 @@ public class PackageParser {
                 grantedPermissions, state, UserHandle.getCallingUserId());
     }
     */
-
-    public static String getLockedZipFilePath(String path) {
-        if (path == null) {
-            return null;
-        }
-        if (isPackageFilename(path)) {
-            return path.substring(0, path.length() - 4) + ".locked.zip";
-        } else {
-            return path + ".locked.zip";
-        }
-    }
 
     public static String getLockedZipFilePath(String path) {
         if (path == null) {

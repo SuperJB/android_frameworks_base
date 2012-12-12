@@ -17,13 +17,12 @@
 
 package android.app;
 
-import com.android.internal.policy.PolicyManager;
-import com.android.internal.util.Preconditions;
-
 import android.accounts.AccountManager;
 import android.accounts.IAccountManager;
+import android.app.admin.DevicePolicyManager;
 import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
+import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -43,7 +42,6 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.AssetManager;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
-import android.content.res.CustomTheme;
 import android.content.res.Resources;
 import android.database.DatabaseErrorHandler;
 import android.database.sqlite.SQLiteDatabase;
@@ -51,11 +49,9 @@ import android.database.sqlite.SQLiteDatabase.CursorFactory;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
 import android.hardware.ISerialManager;
-import android.hardware.SensorManager;
 import android.hardware.SerialManager;
 import android.hardware.SystemSensorManager;
 import android.hardware.display.DisplayManager;
-import android.hardware.input.IInputManager;
 import android.hardware.input.InputManager;
 import android.hardware.usb.IUsbManager;
 import android.hardware.usb.UsbManager;
@@ -68,9 +64,9 @@ import android.media.MediaRouter;
 import android.net.ConnectivityManager;
 import android.net.IConnectivityManager;
 import android.net.INetworkPolicyManager;
+import android.net.IThrottleManager;
 import android.net.NetworkPolicyManager;
 import android.net.ThrottleManager;
-import android.net.IThrottleManager;
 import android.net.Uri;
 import android.net.nsd.INsdManager;
 import android.net.nsd.NsdManager;
@@ -94,12 +90,12 @@ import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
-import android.os.UserHandle;
+import android.os.SystemProperties;
 import android.os.SystemVibrator;
+import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.storage.StorageManager;
 import android.telephony.TelephonyManager;
-import android.content.ClipboardManager;
 import android.util.AndroidRuntimeException;
 import android.util.Log;
 import android.util.Slog;
@@ -110,10 +106,10 @@ import android.view.WindowManagerImpl;
 import android.view.accessibility.AccessibilityManager;
 import android.view.inputmethod.InputMethodManager;
 import android.view.textservice.TextServicesManager;
-import android.accounts.AccountManager;
-import android.accounts.IAccountManager;
-import android.app.admin.DevicePolicyManager;
+
 import com.android.internal.os.IDropBoxManagerService;
+import com.android.internal.policy.PolicyManager;
+import com.android.internal.util.Preconditions;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -168,8 +164,8 @@ class ReceiverRestrictedContext extends ContextWrapper {
 }
 
 /**
- * Common implementation of Context API, which provides the base
- * context object for Activity and other application components.
+ * Common implementation of Context API, which provides the base context object
+ * for Activity and other application components.
  */
 class ContextImpl extends Context {
     private final static String TAG = "ApplicationContext";
@@ -178,10 +174,10 @@ class ContextImpl extends Context {
     private static final HashMap<String, SharedPreferencesImpl> sSharedPrefs =
             new HashMap<String, SharedPreferencesImpl>();
 
-    /*package*/ LoadedApk mPackageInfo;
+    /* package */LoadedApk mPackageInfo;
     private String mBasePackageName;
     private Resources mResources;
-    /*package*/ ActivityThread mMainThread;
+    /* package */ActivityThread mMainThread;
     private Context mOuterContext;
     private IBinder mActivityToken = null;
     private ApplicationContentResolver mContentResolver;
@@ -207,9 +203,9 @@ class ContextImpl extends Context {
 
     /**
      * Override this class when the system service constructor needs a
-     * ContextImpl.  Else, use StaticServiceFetcher below.
+     * ContextImpl. Else, use StaticServiceFetcher below.
      */
-    /*package*/ static class ServiceFetcher {
+    /* package */static class ServiceFetcher {
         int mContextCacheIndex = -1;
 
         /**
@@ -240,8 +236,8 @@ class ContextImpl extends Context {
         }
 
         /**
-         * Override this to create a new per-Context instance of the
-         * service.  getService() will handle locking and caching.
+         * Override this to create a new per-Context instance of the service.
+         * getService() will handle locking and caching.
          */
         public Object createService(ContextImpl ctx) {
             throw new RuntimeException("Not implemented");
@@ -272,6 +268,7 @@ class ContextImpl extends Context {
             new HashMap<String, ServiceFetcher>();
 
     private static int sNextPerContextServiceCacheIndex = 0;
+
     private static void registerService(String serviceName, ServiceFetcher fetcher) {
         if (!(fetcher instanceof StaticServiceFetcher)) {
             fetcher.mContextCacheIndex = sNextPerContextServiceCacheIndex++;
@@ -283,129 +280,151 @@ class ContextImpl extends Context {
     // can be re-used by getWallpaperManager(), avoiding a HashMap
     // lookup.
     private static ServiceFetcher WALLPAPER_FETCHER = new ServiceFetcher() {
-            public Object createService(ContextImpl ctx) {
-                return new WallpaperManager(ctx.getOuterContext(),
-                        ctx.mMainThread.getHandler());
-            }};
+        public Object createService(ContextImpl ctx) {
+            return new WallpaperManager(ctx.getOuterContext(),
+                    ctx.mMainThread.getHandler());
+        }
+    };
 
     static {
         registerService(ACCESSIBILITY_SERVICE, new ServiceFetcher() {
-                public Object getService(ContextImpl ctx) {
-                    return AccessibilityManager.getInstance(ctx);
-                }});
+            public Object getService(ContextImpl ctx) {
+                return AccessibilityManager.getInstance(ctx);
+            }
+        });
 
         registerService(ACCOUNT_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    IBinder b = ServiceManager.getService(ACCOUNT_SERVICE);
-                    IAccountManager service = IAccountManager.Stub.asInterface(b);
-                    return new AccountManager(ctx, service);
-                }});
+            public Object createService(ContextImpl ctx) {
+                IBinder b = ServiceManager.getService(ACCOUNT_SERVICE);
+                IAccountManager service = IAccountManager.Stub.asInterface(b);
+                return new AccountManager(ctx, service);
+            }
+        });
 
         registerService(ACTIVITY_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new ActivityManager(ctx.getOuterContext(), ctx.mMainThread.getHandler());
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new ActivityManager(ctx.getOuterContext(), ctx.mMainThread.getHandler());
+            }
+        });
 
         registerService(ALARM_SERVICE, new StaticServiceFetcher() {
-                public Object createStaticService() {
-                    IBinder b = ServiceManager.getService(ALARM_SERVICE);
-                    IAlarmManager service = IAlarmManager.Stub.asInterface(b);
-                    return new AlarmManager(service);
-                }});
+            public Object createStaticService() {
+                IBinder b = ServiceManager.getService(ALARM_SERVICE);
+                IAlarmManager service = IAlarmManager.Stub.asInterface(b);
+                return new AlarmManager(service);
+            }
+        });
 
         registerService(AUDIO_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new AudioManager(ctx);
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new AudioManager(ctx);
+            }
+        });
 
         registerService(MEDIA_ROUTER_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new MediaRouter(ctx);
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new MediaRouter(ctx);
+            }
+        });
 
         registerService(BLUETOOTH_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return BluetoothAdapter.getDefaultAdapter();
-                }});
+            public Object createService(ContextImpl ctx) {
+                return BluetoothAdapter.getDefaultAdapter();
+            }
+        });
 
         registerService(CLIPBOARD_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new ClipboardManager(ctx.getOuterContext(),
-                            ctx.mMainThread.getHandler());
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new ClipboardManager(ctx.getOuterContext(),
+                        ctx.mMainThread.getHandler());
+            }
+        });
 
         registerService(CONNECTIVITY_SERVICE, new StaticServiceFetcher() {
-                public Object createStaticService() {
-                    IBinder b = ServiceManager.getService(CONNECTIVITY_SERVICE);
-                    return new ConnectivityManager(IConnectivityManager.Stub.asInterface(b));
-                }});
+            public Object createStaticService() {
+                IBinder b = ServiceManager.getService(CONNECTIVITY_SERVICE);
+                return new ConnectivityManager(IConnectivityManager.Stub.asInterface(b));
+            }
+        });
 
         registerService(COUNTRY_DETECTOR, new StaticServiceFetcher() {
-                public Object createStaticService() {
-                    IBinder b = ServiceManager.getService(COUNTRY_DETECTOR);
-                    return new CountryDetector(ICountryDetector.Stub.asInterface(b));
-                }});
+            public Object createStaticService() {
+                IBinder b = ServiceManager.getService(COUNTRY_DETECTOR);
+                return new CountryDetector(ICountryDetector.Stub.asInterface(b));
+            }
+        });
 
         registerService(DEVICE_POLICY_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return DevicePolicyManager.create(ctx, ctx.mMainThread.getHandler());
-                }});
+            public Object createService(ContextImpl ctx) {
+                return DevicePolicyManager.create(ctx, ctx.mMainThread.getHandler());
+            }
+        });
 
         registerService(DOWNLOAD_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new DownloadManager(ctx.getContentResolver(), ctx.getPackageName());
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new DownloadManager(ctx.getContentResolver(), ctx.getPackageName());
+            }
+        });
 
         registerService(NFC_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new NfcManager(ctx);
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new NfcManager(ctx);
+            }
+        });
 
         registerService(DROPBOX_SERVICE, new StaticServiceFetcher() {
-                public Object createStaticService() {
-                    return createDropBoxManager();
-                }});
+            public Object createStaticService() {
+                return createDropBoxManager();
+            }
+        });
 
         registerService(INPUT_SERVICE, new StaticServiceFetcher() {
-                public Object createStaticService() {
-                    return InputManager.getInstance();
-                }});
+            public Object createStaticService() {
+                return InputManager.getInstance();
+            }
+        });
 
         registerService(DISPLAY_SERVICE, new ServiceFetcher() {
-                @Override
-                public Object createService(ContextImpl ctx) {
-                    return new DisplayManager(ctx.getOuterContext());
-                }});
+            @Override
+            public Object createService(ContextImpl ctx) {
+                return new DisplayManager(ctx.getOuterContext());
+            }
+        });
 
         registerService(INPUT_METHOD_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return InputMethodManager.getInstance(ctx);
-                }});
+            public Object createService(ContextImpl ctx) {
+                return InputMethodManager.getInstance(ctx);
+            }
+        });
 
         registerService(TEXT_SERVICES_MANAGER_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return TextServicesManager.getInstance();
-                }});
+            public Object createService(ContextImpl ctx) {
+                return TextServicesManager.getInstance();
+            }
+        });
 
         registerService(KEYGUARD_SERVICE, new ServiceFetcher() {
-                public Object getService(ContextImpl ctx) {
-                    // TODO: why isn't this caching it?  It wasn't
-                    // before, so I'm preserving the old behavior and
-                    // using getService(), instead of createService()
-                    // which would do the caching.
-                    return new KeyguardManager();
-                }});
+            public Object getService(ContextImpl ctx) {
+                // TODO: why isn't this caching it? It wasn't
+                // before, so I'm preserving the old behavior and
+                // using getService(), instead of createService()
+                // which would do the caching.
+                return new KeyguardManager();
+            }
+        });
 
         registerService(LAYOUT_INFLATER_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return PolicyManager.makeNewLayoutInflater(ctx.getOuterContext());
-                }});
+            public Object createService(ContextImpl ctx) {
+                return PolicyManager.makeNewLayoutInflater(ctx.getOuterContext());
+            }
+        });
 
         registerService(LOCATION_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    IBinder b = ServiceManager.getService(LOCATION_SERVICE);
-                    return new LocationManager(ctx, ILocationManager.Stub.asInterface(b));
-                }});
+            public Object createService(ContextImpl ctx) {
+                IBinder b = ServiceManager.getService(LOCATION_SERVICE);
+                return new LocationManager(ctx, ILocationManager.Stub.asInterface(b));
+            }
+        });
 
         registerService(NETWORK_POLICY_SERVICE, new ServiceFetcher() {
             @Override
@@ -416,9 +435,9 @@ class ContextImpl extends Context {
         });
 
         registerService(NOTIFICATION_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    final Context outerContext = ctx.getOuterContext();
-                    return new NotificationManager(
+            public Object createService(ContextImpl ctx) {
+                final Context outerContext = ctx.getOuterContext();
+                return new NotificationManager(
                         new ContextThemeWrapper(outerContext,
                                 Resources.selectSystemTheme(0,
                                         outerContext.getApplicationInfo().targetSdkVersion,
@@ -426,139 +445,157 @@ class ContextImpl extends Context {
                                         com.android.internal.R.style.Theme_Holo_Dialog,
                                         com.android.internal.R.style.Theme_DeviceDefault_Dialog)),
                         ctx.mMainThread.getHandler());
-                }});
+            }
+        });
 
         registerService(NSD_SERVICE, new ServiceFetcher() {
-                @Override
-                public Object createService(ContextImpl ctx) {
-                    IBinder b = ServiceManager.getService(NSD_SERVICE);
-                    INsdManager service = INsdManager.Stub.asInterface(b);
-                    return new NsdManager(ctx.getOuterContext(), service);
-                }});
+            @Override
+            public Object createService(ContextImpl ctx) {
+                IBinder b = ServiceManager.getService(NSD_SERVICE);
+                INsdManager service = INsdManager.Stub.asInterface(b);
+                return new NsdManager(ctx.getOuterContext(), service);
+            }
+        });
 
         // Note: this was previously cached in a static variable, but
         // constructed using mMainThread.getHandler(), so converting
         // it to be a regular Context-cached service...
         registerService(POWER_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    IBinder b = ServiceManager.getService(POWER_SERVICE);
-                    IPowerManager service = IPowerManager.Stub.asInterface(b);
-                    return new PowerManager(ctx.getOuterContext(),
-                            service, ctx.mMainThread.getHandler());
-                }});
+            public Object createService(ContextImpl ctx) {
+                IBinder b = ServiceManager.getService(POWER_SERVICE);
+                IPowerManager service = IPowerManager.Stub.asInterface(b);
+                return new PowerManager(ctx.getOuterContext(),
+                        service, ctx.mMainThread.getHandler());
+            }
+        });
 
         registerService(SEARCH_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new SearchManager(ctx.getOuterContext(),
-                            ctx.mMainThread.getHandler());
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new SearchManager(ctx.getOuterContext(),
+                        ctx.mMainThread.getHandler());
+            }
+        });
 
         registerService(SENSOR_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new SystemSensorManager(ctx.mMainThread.getHandler().getLooper());
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new SystemSensorManager(ctx.mMainThread.getHandler().getLooper());
+            }
+        });
 
         registerService(STATUS_BAR_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new StatusBarManager(ctx.getOuterContext());
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new StatusBarManager(ctx.getOuterContext());
+            }
+        });
 
         registerService(STORAGE_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    try {
-                        return new StorageManager(ctx.mMainThread.getHandler().getLooper());
-                    } catch (RemoteException rex) {
-                        Log.e(TAG, "Failed to create StorageManager", rex);
-                        return null;
-                    }
-                }});
+            public Object createService(ContextImpl ctx) {
+                try {
+                    return new StorageManager(ctx.mMainThread.getHandler().getLooper());
+                } catch (RemoteException rex) {
+                    Log.e(TAG, "Failed to create StorageManager", rex);
+                    return null;
+                }
+            }
+        });
 
         registerService(TELEPHONY_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new TelephonyManager(ctx.getOuterContext());
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new TelephonyManager(ctx.getOuterContext());
+            }
+        });
 
         registerService(THROTTLE_SERVICE, new StaticServiceFetcher() {
-                public Object createStaticService() {
-                    IBinder b = ServiceManager.getService(THROTTLE_SERVICE);
-                    return new ThrottleManager(IThrottleManager.Stub.asInterface(b));
-                }});
+            public Object createStaticService() {
+                IBinder b = ServiceManager.getService(THROTTLE_SERVICE);
+                return new ThrottleManager(IThrottleManager.Stub.asInterface(b));
+            }
+        });
 
         registerService(UI_MODE_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new UiModeManager();
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new UiModeManager();
+            }
+        });
 
         registerService(USB_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    IBinder b = ServiceManager.getService(USB_SERVICE);
-                    return new UsbManager(ctx, IUsbManager.Stub.asInterface(b));
-                }});
+            public Object createService(ContextImpl ctx) {
+                IBinder b = ServiceManager.getService(USB_SERVICE);
+                return new UsbManager(ctx, IUsbManager.Stub.asInterface(b));
+            }
+        });
 
         registerService(SERIAL_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    IBinder b = ServiceManager.getService(SERIAL_SERVICE);
-                    return new SerialManager(ctx, ISerialManager.Stub.asInterface(b));
-                }});
+            public Object createService(ContextImpl ctx) {
+                IBinder b = ServiceManager.getService(SERIAL_SERVICE);
+                return new SerialManager(ctx, ISerialManager.Stub.asInterface(b));
+            }
+        });
 
         registerService(VIBRATOR_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    return new SystemVibrator();
-                }});
+            public Object createService(ContextImpl ctx) {
+                return new SystemVibrator();
+            }
+        });
 
         registerService(WALLPAPER_SERVICE, WALLPAPER_FETCHER);
 
         registerService(WIFI_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    IBinder b = ServiceManager.getService(WIFI_SERVICE);
-                    IWifiManager service = IWifiManager.Stub.asInterface(b);
-                    return new WifiManager(ctx.getOuterContext(), service);
-                }});
+            public Object createService(ContextImpl ctx) {
+                IBinder b = ServiceManager.getService(WIFI_SERVICE);
+                IWifiManager service = IWifiManager.Stub.asInterface(b);
+                return new WifiManager(ctx.getOuterContext(), service);
+            }
+        });
 
         registerService(WIFI_P2P_SERVICE, new ServiceFetcher() {
-                public Object createService(ContextImpl ctx) {
-                    IBinder b = ServiceManager.getService(WIFI_P2P_SERVICE);
-                    IWifiP2pManager service = IWifiP2pManager.Stub.asInterface(b);
-                    return new WifiP2pManager(service);
-                }});
+            public Object createService(ContextImpl ctx) {
+                IBinder b = ServiceManager.getService(WIFI_P2P_SERVICE);
+                IWifiP2pManager service = IWifiP2pManager.Stub.asInterface(b);
+                return new WifiP2pManager(service);
+            }
+        });
 
-if (SystemProperties.get("ro.allwinner.device").equals("1")) {
-        registerService(DISPLAY_SERVICE, new ServiceFetcher() {
+        if (SystemProperties.get("ro.allwinner.device").equals("1")) {
+            registerService(DISPLAY_SERVICE, new ServiceFetcher() {
                 public Object createService(ContextImpl ctx) {
-                    return new DisplayManager();
-                }});
-}
+                    return new DisplayManager(ctx);
+                }
+            });
+        }
 
         registerService(WINDOW_SERVICE, new ServiceFetcher() {
-                public Object getService(ContextImpl ctx) {
-                    Display display = ctx.mDisplay;
-                    if (display == null) {
-                        DisplayManager dm = (DisplayManager)ctx.getOuterContext().getSystemService(
-                                Context.DISPLAY_SERVICE);
-                        display = dm.getDisplay(Display.DEFAULT_DISPLAY);
-                    }
-                    return new WindowManagerImpl(display);
-                }});
+            public Object getService(ContextImpl ctx) {
+                Display display = ctx.mDisplay;
+                if (display == null) {
+                    DisplayManager dm = (DisplayManager) ctx.getOuterContext().getSystemService(
+                            Context.DISPLAY_SERVICE);
+                    display = dm.getDisplay(Display.DEFAULT_DISPLAY);
+                }
+                return new WindowManagerImpl(display);
+            }
+        });
 
         registerService(USER_SERVICE, new ServiceFetcher() {
             public Object getService(ContextImpl ctx) {
                 IBinder b = ServiceManager.getService(USER_SERVICE);
                 IUserManager service = IUserManager.Stub.asInterface(b);
                 return new UserManager(ctx, service);
-            }});
+            }
+        });
     }
 
     static ContextImpl getImpl(Context context) {
         Context nextContext;
         while ((context instanceof ContextWrapper) &&
-                (nextContext=((ContextWrapper)context).getBaseContext()) != null) {
+                (nextContext = ((ContextWrapper) context).getBaseContext()) != null) {
             context = nextContext;
         }
-        return (ContextImpl)context;
+        return (ContextImpl) context;
     }
 
     // The system service cache for the system services that are
-    // cached per-ContextImpl.  Package-scoped to avoid accessor
+    // cached per-ContextImpl. Package-scoped to avoid accessor
     // methods.
     final ArrayList<Object> mServiceCache = new ArrayList<Object>();
 
@@ -576,7 +613,7 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
      * Refresh resources object which may have been changed by a theme
      * configuration change.
      */
-    /* package */ void refreshResourcesIfNecessary() {
+    /* package */void refreshResourcesIfNecessary() {
         if (mResources == Resources.getSystem()) {
             return;
         }
@@ -693,9 +730,9 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
             }
         }
         if ((mode & Context.MODE_MULTI_PROCESS) != 0 ||
-            getApplicationInfo().targetSdkVersion < android.os.Build.VERSION_CODES.HONEYCOMB) {
+                getApplicationInfo().targetSdkVersion < android.os.Build.VERSION_CODES.HONEYCOMB) {
             // If somebody else (some other process) changed the prefs
-            // file behind our back, we reload it.  This has been the
+            // file behind our back, we reload it. This has been the
             // historical (if undocumented) behavior.
             sp.startReloadIfChangedUnexpectedly();
         }
@@ -713,15 +750,15 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
 
     @Override
     public FileInputStream openFileInput(String name)
-        throws FileNotFoundException {
+            throws FileNotFoundException {
         File f = makeFilename(getFilesDir(), name);
         return new FileInputStream(f);
     }
 
     @Override
     public FileOutputStream openFileOutput(String name, int mode)
-        throws FileNotFoundException {
-        final boolean append = (mode&MODE_APPEND) != 0;
+            throws FileNotFoundException {
+        final boolean append = (mode & MODE_APPEND) != 0;
         File f = makeFilename(getFilesDir(), name);
         try {
             FileOutputStream fos = new FileOutputStream(f, append);
@@ -733,9 +770,9 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         File parent = f.getParentFile();
         parent.mkdir();
         FileUtils.setPermissions(
-            parent.getPath(),
-            FileUtils.S_IRWXU|FileUtils.S_IRWXG|FileUtils.S_IXOTH,
-            -1, -1);
+                parent.getPath(),
+                FileUtils.S_IRWXU | FileUtils.S_IRWXG | FileUtils.S_IXOTH,
+                -1, -1);
         FileOutputStream fos = new FileOutputStream(f, append);
         setFilePermissionsFromMode(f.getPath(), mode, 0);
         return fos;
@@ -754,13 +791,13 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
                 mFilesDir = new File(getDataDirFile(), "files");
             }
             if (!mFilesDir.exists()) {
-                if(!mFilesDir.mkdirs()) {
+                if (!mFilesDir.mkdirs()) {
                     Log.w(TAG, "Unable to create files directory " + mFilesDir.getPath());
                     return null;
                 }
                 FileUtils.setPermissions(
                         mFilesDir.getPath(),
-                        FileUtils.S_IRWXU|FileUtils.S_IRWXG|FileUtils.S_IXOTH,
+                        FileUtils.S_IRWXU | FileUtils.S_IRWXG | FileUtils.S_IXOTH,
                         -1, -1);
             }
             return mFilesDir;
@@ -817,13 +854,13 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
                 mCacheDir = new File(getDataDirFile(), "cache");
             }
             if (!mCacheDir.exists()) {
-                if(!mCacheDir.mkdirs()) {
+                if (!mCacheDir.mkdirs()) {
                     Log.w(TAG, "Unable to create cache directory " + mCacheDir.getAbsolutePath());
                     return null;
                 }
                 FileUtils.setPermissions(
                         mCacheDir.getPath(),
-                        FileUtils.S_IRWXU|FileUtils.S_IRWXG|FileUtils.S_IXOTH,
+                        FileUtils.S_IRWXU | FileUtils.S_IRWXG | FileUtils.S_IXOTH,
                         -1, -1);
             }
         }
@@ -902,7 +939,6 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         return (list != null) ? list : EMPTY_FILE_LIST;
     }
 
-
     private File getDatabasesDir() {
         synchronized (mSync) {
             if (mDatabasesDir == null) {
@@ -936,7 +972,7 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
     }
 
     @Override
-    public void setWallpaper(Bitmap bitmap) throws IOException  {
+    public void setWallpaper(Bitmap bitmap) throws IOException {
         getWallpaperManager().setBitmap(bitmap);
     }
 
@@ -965,15 +1001,15 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
     @Override
     public void startActivity(Intent intent, Bundle options) {
         warnIfCallingFromSystemProcess();
-        if ((intent.getFlags()&Intent.FLAG_ACTIVITY_NEW_TASK) == 0) {
+        if ((intent.getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) == 0) {
             throw new AndroidRuntimeException(
                     "Calling startActivity() from outside of an Activity "
-                    + " context requires the FLAG_ACTIVITY_NEW_TASK flag."
-                    + " Is this really what you want?");
+                            + " context requires the FLAG_ACTIVITY_NEW_TASK flag."
+                            + " Is this really what you want?");
         }
         mMainThread.getInstrumentation().execStartActivity(
-            getOuterContext(), mMainThread.getApplicationThread(), null,
-            (Activity)null, intent, -1, options);
+                getOuterContext(), mMainThread.getApplicationThread(), null,
+                (Activity) null, intent, -1, options);
     }
 
     /** @hide */
@@ -981,10 +1017,10 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
     public void startActivityAsUser(Intent intent, Bundle options, UserHandle user) {
         try {
             ActivityManagerNative.getDefault().startActivityAsUser(
-                mMainThread.getApplicationThread(), intent,
-                intent.resolveTypeIfNeeded(getContentResolver()),
-                null, null, 0, Intent.FLAG_ACTIVITY_NEW_TASK, null, null, options,
-                user.getIdentifier());
+                    mMainThread.getApplicationThread(), intent,
+                    intent.resolveTypeIfNeeded(getContentResolver()),
+                    null, null, 0, Intent.FLAG_ACTIVITY_NEW_TASK, null, null, options,
+                    user.getIdentifier());
         } catch (RemoteException re) {
         }
     }
@@ -998,29 +1034,29 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
     /** @hide */
     @Override
     public void startActivitiesAsUser(Intent[] intents, Bundle options, UserHandle userHandle) {
-        if ((intents[0].getFlags()&Intent.FLAG_ACTIVITY_NEW_TASK) == 0) {
+        if ((intents[0].getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) == 0) {
             throw new AndroidRuntimeException(
                     "Calling startActivities() from outside of an Activity "
-                    + " context requires the FLAG_ACTIVITY_NEW_TASK flag on first Intent."
-                    + " Is this really what you want?");
+                            + " context requires the FLAG_ACTIVITY_NEW_TASK flag on first Intent."
+                            + " Is this really what you want?");
         }
         mMainThread.getInstrumentation().execStartActivitiesAsUser(
-            getOuterContext(), mMainThread.getApplicationThread(), null,
-            (Activity)null, intents, options, userHandle.getIdentifier());
+                getOuterContext(), mMainThread.getApplicationThread(), null,
+                (Activity) null, intents, options, userHandle.getIdentifier());
     }
 
     @Override
     public void startActivities(Intent[] intents, Bundle options) {
         warnIfCallingFromSystemProcess();
-        if ((intents[0].getFlags()&Intent.FLAG_ACTIVITY_NEW_TASK) == 0) {
+        if ((intents[0].getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) == 0) {
             throw new AndroidRuntimeException(
                     "Calling startActivities() from outside of an Activity "
-                    + " context requires the FLAG_ACTIVITY_NEW_TASK flag on first Intent."
-                    + " Is this really what you want?");
+                            + " context requires the FLAG_ACTIVITY_NEW_TASK flag on first Intent."
+                            + " Is this really what you want?");
         }
         mMainThread.getInstrumentation().execStartActivities(
-            getOuterContext(), mMainThread.getApplicationThread(), null,
-            (Activity)null, intents, options);
+                getOuterContext(), mMainThread.getApplicationThread(), null,
+                (Activity) null, intents, options);
     }
 
     @Override
@@ -1041,9 +1077,9 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
                 resolvedType = fillInIntent.resolveTypeIfNeeded(getContentResolver());
             }
             int result = ActivityManagerNative.getDefault()
-                .startActivityIntentSender(mMainThread.getApplicationThread(), intent,
-                        fillInIntent, resolvedType, null, null,
-                        0, flagsMask, flagsValues, options);
+                    .startActivityIntentSender(mMainThread.getApplicationThread(), intent,
+                            fillInIntent, resolvedType, null, null,
+                            0, flagsMask, flagsValues, options);
             if (result == ActivityManager.START_CANCELED) {
                 throw new IntentSender.SendIntentException();
             }
@@ -1059,9 +1095,9 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         try {
             intent.setAllowFds(false);
             ActivityManagerNative.getDefault().broadcastIntent(
-                mMainThread.getApplicationThread(), intent, resolvedType, null,
-                Activity.RESULT_OK, null, null, null, false, false,
-                getUserId());
+                    mMainThread.getApplicationThread(), intent, resolvedType, null,
+                    Activity.RESULT_OK, null, null, null, false, false,
+                    getUserId());
         } catch (RemoteException e) {
         }
     }
@@ -1073,9 +1109,9 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         try {
             intent.setAllowFds(false);
             ActivityManagerNative.getDefault().broadcastIntent(
-                mMainThread.getApplicationThread(), intent, resolvedType, null,
-                Activity.RESULT_OK, null, null, receiverPermission, false, false,
-                getUserId());
+                    mMainThread.getApplicationThread(), intent, resolvedType, null,
+                    Activity.RESULT_OK, null, null, receiverPermission, false, false,
+                    getUserId());
         } catch (RemoteException e) {
         }
     }
@@ -1088,9 +1124,9 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         try {
             intent.setAllowFds(false);
             ActivityManagerNative.getDefault().broadcastIntent(
-                mMainThread.getApplicationThread(), intent, resolvedType, null,
-                Activity.RESULT_OK, null, null, receiverPermission, true, false,
-                getUserId());
+                    mMainThread.getApplicationThread(), intent, resolvedType, null,
+                    Activity.RESULT_OK, null, null, receiverPermission, true, false,
+                    getUserId());
         } catch (RemoteException e) {
         }
     }
@@ -1108,23 +1144,24 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
                     scheduler = mMainThread.getHandler();
                 }
                 rd = mPackageInfo.getReceiverDispatcher(
-                    resultReceiver, getOuterContext(), scheduler,
-                    mMainThread.getInstrumentation(), false);
+                        resultReceiver, getOuterContext(), scheduler,
+                        mMainThread.getInstrumentation(), false);
             } else {
                 if (scheduler == null) {
                     scheduler = mMainThread.getHandler();
                 }
                 rd = new LoadedApk.ReceiverDispatcher(
-                        resultReceiver, getOuterContext(), scheduler, null, false).getIIntentReceiver();
+                        resultReceiver, getOuterContext(), scheduler, null, false)
+                        .getIIntentReceiver();
             }
         }
         String resolvedType = intent.resolveTypeIfNeeded(getContentResolver());
         try {
             intent.setAllowFds(false);
             ActivityManagerNative.getDefault().broadcastIntent(
-                mMainThread.getApplicationThread(), intent, resolvedType, rd,
-                initialCode, initialData, initialExtras, receiverPermission,
-                true, false, getUserId());
+                    mMainThread.getApplicationThread(), intent, resolvedType, rd,
+                    initialCode, initialData, initialExtras, receiverPermission,
+                    true, false, getUserId());
         } catch (RemoteException e) {
         }
     }
@@ -1148,9 +1185,9 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         try {
             intent.setAllowFds(false);
             ActivityManagerNative.getDefault().broadcastIntent(
-                mMainThread.getApplicationThread(), intent, resolvedType, null,
-                Activity.RESULT_OK, null, null, receiverPermission, false, false,
-                user.getIdentifier());
+                    mMainThread.getApplicationThread(), intent, resolvedType, null,
+                    Activity.RESULT_OK, null, null, receiverPermission, false, false,
+                    user.getIdentifier());
         } catch (RemoteException e) {
         }
     }
@@ -1166,23 +1203,24 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
                     scheduler = mMainThread.getHandler();
                 }
                 rd = mPackageInfo.getReceiverDispatcher(
-                    resultReceiver, getOuterContext(), scheduler,
-                    mMainThread.getInstrumentation(), false);
+                        resultReceiver, getOuterContext(), scheduler,
+                        mMainThread.getInstrumentation(), false);
             } else {
                 if (scheduler == null) {
                     scheduler = mMainThread.getHandler();
                 }
                 rd = new LoadedApk.ReceiverDispatcher(
-                        resultReceiver, getOuterContext(), scheduler, null, false).getIIntentReceiver();
+                        resultReceiver, getOuterContext(), scheduler, null, false)
+                        .getIIntentReceiver();
             }
         }
         String resolvedType = intent.resolveTypeIfNeeded(getContentResolver());
         try {
             intent.setAllowFds(false);
             ActivityManagerNative.getDefault().broadcastIntent(
-                mMainThread.getApplicationThread(), intent, resolvedType, rd,
-                initialCode, initialData, initialExtras, receiverPermission,
-                true, false, user.getIdentifier());
+                    mMainThread.getApplicationThread(), intent, resolvedType, rd,
+                    initialCode, initialData, initialExtras, receiverPermission,
+                    true, false, user.getIdentifier());
         } catch (RemoteException e) {
         }
     }
@@ -1194,9 +1232,9 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         try {
             intent.setAllowFds(false);
             ActivityManagerNative.getDefault().broadcastIntent(
-                mMainThread.getApplicationThread(), intent, resolvedType, null,
-                Activity.RESULT_OK, null, null, null, false, true,
-                getUserId());
+                    mMainThread.getApplicationThread(), intent, resolvedType, null,
+                    Activity.RESULT_OK, null, null, null, false, true,
+                    getUserId());
         } catch (RemoteException e) {
         }
     }
@@ -1214,23 +1252,24 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
                     scheduler = mMainThread.getHandler();
                 }
                 rd = mPackageInfo.getReceiverDispatcher(
-                    resultReceiver, getOuterContext(), scheduler,
-                    mMainThread.getInstrumentation(), false);
+                        resultReceiver, getOuterContext(), scheduler,
+                        mMainThread.getInstrumentation(), false);
             } else {
                 if (scheduler == null) {
                     scheduler = mMainThread.getHandler();
                 }
                 rd = new LoadedApk.ReceiverDispatcher(
-                        resultReceiver, getOuterContext(), scheduler, null, false).getIIntentReceiver();
+                        resultReceiver, getOuterContext(), scheduler, null, false)
+                        .getIIntentReceiver();
             }
         }
         String resolvedType = intent.resolveTypeIfNeeded(getContentResolver());
         try {
             intent.setAllowFds(false);
             ActivityManagerNative.getDefault().broadcastIntent(
-                mMainThread.getApplicationThread(), intent, resolvedType, rd,
-                initialCode, initialData, initialExtras, null,
-                true, true, getUserId());
+                    mMainThread.getApplicationThread(), intent, resolvedType, rd,
+                    initialCode, initialData, initialExtras, null,
+                    true, true, getUserId());
         } catch (RemoteException e) {
         }
     }
@@ -1256,8 +1295,8 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         try {
             intent.setAllowFds(false);
             ActivityManagerNative.getDefault().broadcastIntent(
-                mMainThread.getApplicationThread(), intent, resolvedType, null,
-                Activity.RESULT_OK, null, null, null, false, true, user.getIdentifier());
+                    mMainThread.getApplicationThread(), intent, resolvedType, null,
+                    Activity.RESULT_OK, null, null, null, false, true, user.getIdentifier());
         } catch (RemoteException e) {
         }
     }
@@ -1274,23 +1313,24 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
                     scheduler = mMainThread.getHandler();
                 }
                 rd = mPackageInfo.getReceiverDispatcher(
-                    resultReceiver, getOuterContext(), scheduler,
-                    mMainThread.getInstrumentation(), false);
+                        resultReceiver, getOuterContext(), scheduler,
+                        mMainThread.getInstrumentation(), false);
             } else {
                 if (scheduler == null) {
                     scheduler = mMainThread.getHandler();
                 }
                 rd = new LoadedApk.ReceiverDispatcher(
-                        resultReceiver, getOuterContext(), scheduler, null, false).getIIntentReceiver();
+                        resultReceiver, getOuterContext(), scheduler, null, false)
+                        .getIIntentReceiver();
             }
         }
         String resolvedType = intent.resolveTypeIfNeeded(getContentResolver());
         try {
             intent.setAllowFds(false);
             ActivityManagerNative.getDefault().broadcastIntent(
-                mMainThread.getApplicationThread(), intent, resolvedType, rd,
-                initialCode, initialData, initialExtras, null,
-                true, true, user.getIdentifier());
+                    mMainThread.getApplicationThread(), intent, resolvedType, rd,
+                    initialCode, initialData, initialExtras, null,
+                    true, true, user.getIdentifier());
         } catch (RemoteException e) {
         }
     }
@@ -1339,8 +1379,8 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
                     scheduler = mMainThread.getHandler();
                 }
                 rd = mPackageInfo.getReceiverDispatcher(
-                    receiver, context, scheduler,
-                    mMainThread.getInstrumentation(), true);
+                        receiver, context, scheduler,
+                        mMainThread.getInstrumentation(), true);
             } else {
                 if (scheduler == null) {
                     scheduler = mMainThread.getHandler();
@@ -1389,17 +1429,17 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         try {
             service.setAllowFds(false);
             ComponentName cn = ActivityManagerNative.getDefault().startService(
-                mMainThread.getApplicationThread(), service,
-                service.resolveTypeIfNeeded(getContentResolver()), user.getIdentifier());
+                    mMainThread.getApplicationThread(), service,
+                    service.resolveTypeIfNeeded(getContentResolver()), user.getIdentifier());
             if (cn != null) {
                 if (cn.getPackageName().equals("!")) {
                     throw new SecurityException(
                             "Not allowed to start service " + service
-                            + " without permission " + cn.getClassName());
+                                    + " without permission " + cn.getClassName());
                 } else if (cn.getPackageName().equals("!!")) {
                     throw new SecurityException(
                             "Unable to start service " + service
-                            + ": " + cn.getClassName());
+                                    + ": " + cn.getClassName());
                 }
             }
             return cn;
@@ -1413,8 +1453,8 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         try {
             service.setAllowFds(false);
             int res = ActivityManagerNative.getDefault().stopService(
-                mMainThread.getApplicationThread(), service,
-                service.resolveTypeIfNeeded(getContentResolver()), user.getIdentifier());
+                    mMainThread.getApplicationThread(), service,
+                    service.resolveTypeIfNeeded(getContentResolver()), user.getIdentifier());
             if (res < 0) {
                 throw new SecurityException(
                         "Not allowed to stop service " + service);
@@ -1447,16 +1487,16 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         }
         try {
             IBinder token = getActivityToken();
-            if (token == null && (flags&BIND_AUTO_CREATE) == 0 && mPackageInfo != null
+            if (token == null && (flags & BIND_AUTO_CREATE) == 0 && mPackageInfo != null
                     && mPackageInfo.getApplicationInfo().targetSdkVersion
                     < android.os.Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
                 flags |= BIND_WAIVE_PRIORITY;
             }
             service.setAllowFds(false);
             int res = ActivityManagerNative.getDefault().bindService(
-                mMainThread.getApplicationThread(), getActivityToken(),
-                service, service.resolveTypeIfNeeded(getContentResolver()),
-                sd, flags, userHandle);
+                    mMainThread.getApplicationThread(), getActivityToken(),
+                    service, service.resolveTypeIfNeeded(getContentResolver()),
+                    sd, flags, userHandle);
             if (res < 0) {
                 throw new SecurityException(
                         "Not allowed to bind to service " + service);
@@ -1509,7 +1549,7 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         return (WallpaperManager) WALLPAPER_FETCHER.getService(this);
     }
 
-    /* package */ static DropBoxManager createDropBoxManager() {
+    /* package */static DropBoxManager createDropBoxManager() {
         IBinder b = ServiceManager.getService(DROPBOX_SERVICE);
         IDropBoxManagerService service = IDropBoxManagerService.Stub.asInterface(b);
         if (service == null) {
@@ -1565,11 +1605,11 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         if (resultOfCheck != PackageManager.PERMISSION_GRANTED) {
             throw new SecurityException(
                     (message != null ? (message + ": ") : "") +
-                    (selfToo
-                     ? "Neither user " + uid + " nor current process has "
-                     : "uid " + uid + " does not have ") +
-                    permission +
-                    ".");
+                            (selfToo
+                                    ? "Neither user " + uid + " nor current process has "
+                                    : "uid " + uid + " does not have ") +
+                            permission +
+                            ".");
         }
     }
 
@@ -1601,7 +1641,7 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
 
     @Override
     public void grantUriPermission(String toPackage, Uri uri, int modeFlags) {
-         try {
+        try {
             ActivityManagerNative.getDefault().grantUriPermission(
                     mMainThread.getApplicationThread(), toPackage, uri,
                     modeFlags);
@@ -1611,7 +1651,7 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
 
     @Override
     public void revokeUriPermission(Uri uri, int modeFlags) {
-         try {
+        try {
             ActivityManagerNative.getDefault().revokeUriPermission(
                     mMainThread.getApplicationThread(), uri,
                     modeFlags);
@@ -1653,17 +1693,17 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
                     + readPermission + " writePermission=" + writePermission
                     + " pid=" + pid + " uid=" + uid + " mode" + modeFlags);
         }
-        if ((modeFlags&Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) {
+        if ((modeFlags & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) {
             if (readPermission == null
                     || checkPermission(readPermission, pid, uid)
-                    == PackageManager.PERMISSION_GRANTED) {
+                        == PackageManager.PERMISSION_GRANTED) {
                 return PackageManager.PERMISSION_GRANTED;
             }
         }
-        if ((modeFlags&Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0) {
+        if ((modeFlags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0) {
             if (writePermission == null
                     || checkPermission(writePermission, pid, uid)
-                    == PackageManager.PERMISSION_GRANTED) {
+                        == PackageManager.PERMISSION_GRANTED) {
                 return PackageManager.PERMISSION_GRANTED;
             }
         }
@@ -1691,13 +1731,13 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         if (resultOfCheck != PackageManager.PERMISSION_GRANTED) {
             throw new SecurityException(
                     (message != null ? (message + ": ") : "") +
-                    (selfToo
-                     ? "Neither user " + uid + " nor current process has "
-                     : "User " + uid + " does not have ") +
-                    uriModeFlagToString(modeFlags) +
-                    " permission on " +
-                    uri +
-                    ".");
+                            (selfToo
+                                    ? "Neither user " + uid + " nor current process has "
+                                    : "User " + uid + " does not have ") +
+                            uriModeFlagToString(modeFlags) +
+                            " permission on " +
+                            uri +
+                            ".");
         }
     }
 
@@ -1728,13 +1768,13 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
             Uri uri, String readPermission, String writePermission,
             int pid, int uid, int modeFlags, String message) {
         enforceForUri(modeFlags,
-                      checkUriPermission(
-                              uri, readPermission, writePermission, pid, uid,
-                              modeFlags),
-                      false,
-                      uid,
-                      uri,
-                      message);
+                checkUriPermission(
+                        uri, readPermission, writePermission, pid, uid,
+                        modeFlags),
+                false,
+                uid,
+                uri,
+                message);
     }
 
     private void warnIfCallingFromSystemProcess() {
@@ -1762,8 +1802,8 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         }
 
         LoadedApk pi =
-            mMainThread.getPackageInfo(packageName, mResources.getCompatibilityInfo(), flags,
-                    user.getIdentifier());
+                mMainThread.getPackageInfo(packageName, mResources.getCompatibilityInfo(), flags,
+                        user.getIdentifier());
         if (pi != null) {
             ContextImpl c = new ContextImpl();
             c.mRestricted = (flags & CONTEXT_RESTRICTED) == CONTEXT_RESTRICTED;
@@ -1775,7 +1815,7 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
 
         // Should be a better exception.
         throw new PackageManager.NameNotFoundException(
-            "Application package " + packageName + " not found");
+                "Application package " + packageName + " not found");
     }
 
     @Override
@@ -1842,7 +1882,7 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
         if (!file.exists()) {
             file.mkdir();
             setFilePermissionsFromMode(file.getPath(), mode,
-                    FileUtils.S_IRWXU|FileUtils.S_IRWXG|FileUtils.S_IXOTH);
+                    FileUtils.S_IRWXU | FileUtils.S_IRWXG | FileUtils.S_IXOTH);
         }
         return file;
     }
@@ -1863,9 +1903,9 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
     }
 
     /**
-     * Create a new ApplicationContext from an existing one.  The new one
-     * works and operates the same as the one it is copying.
-     *
+     * Create a new ApplicationContext from an existing one. The new one works
+     * and operates the same as the one it is copying.
+     * 
      * @param context Existing application context.
      */
     public ContextImpl(ContextImpl context) {
@@ -1891,7 +1931,7 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
 
         if (mResources != null && container != null
                 && container.getCompatibilityInfo().applicationScale !=
-                        mResources.getCompatibilityInfo().applicationScale) {
+                mResources.getCompatibilityInfo().applicationScale) {
             if (DEBUG) {
                 Log.d(TAG, "loaded context has different scaling. Using container's" +
                         " compatiblity info:" + container.getDisplayMetrics());
@@ -1920,7 +1960,7 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
     }
 
     final void performFinalCleanup(String who, String what) {
-        //Log.i(TAG, "Cleanup up context: " + this);
+        // Log.i(TAG, "Cleanup up context: " + this);
         mPackageInfo.removeContextRegistrations(getOuterContext(), who, what);
     }
 
@@ -1945,18 +1985,18 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
 
     static void setFilePermissionsFromMode(String name, int mode,
             int extraPermissions) {
-        int perms = FileUtils.S_IRUSR|FileUtils.S_IWUSR
-            |FileUtils.S_IRGRP|FileUtils.S_IWGRP
-            |extraPermissions;
-        if ((mode&MODE_WORLD_READABLE) != 0) {
+        int perms = FileUtils.S_IRUSR | FileUtils.S_IWUSR
+                | FileUtils.S_IRGRP | FileUtils.S_IWGRP
+                | extraPermissions;
+        if ((mode & MODE_WORLD_READABLE) != 0) {
             perms |= FileUtils.S_IROTH;
         }
-        if ((mode&MODE_WORLD_WRITEABLE) != 0) {
+        if ((mode & MODE_WORLD_WRITEABLE) != 0) {
             perms |= FileUtils.S_IWOTH;
         }
         if (DEBUG) {
             Log.i(TAG, "File " + name + ": mode=0x" + Integer.toHexString(mode)
-                  + ", perms=0x" + Integer.toHexString(perms));
+                    + ", perms=0x" + Integer.toHexString(perms));
         }
         FileUtils.setPermissions(name, perms, -1, -1);
     }
@@ -1977,8 +2017,8 @@ if (SystemProperties.get("ro.allwinner.device").equals("1")) {
 
         if (createDirectory && !dir.isDirectory() && dir.mkdir()) {
             FileUtils.setPermissions(dir.getPath(),
-                FileUtils.S_IRWXU|FileUtils.S_IRWXG|FileUtils.S_IXOTH,
-                -1, -1);
+                    FileUtils.S_IRWXU | FileUtils.S_IRWXG | FileUtils.S_IXOTH,
+                    -1, -1);
         }
 
         return f;

@@ -36,8 +36,6 @@ import android.os.Message;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.RemoteException;
-import android.os.SystemClock;
-import android.provider.Settings;
 import android.text.Spannable;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
@@ -50,7 +48,6 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-
 import com.android.internal.R;
 
 public class TransportControlView extends FrameLayout implements OnClickListener,
@@ -61,16 +58,11 @@ public class TransportControlView extends FrameLayout implements OnClickListener
     private static final int MSG_SET_TRANSPORT_CONTROLS = 102;
     private static final int MSG_SET_ARTWORK = 103;
     private static final int MSG_SET_GENERATION_ID = 104;
-    private static final int MAXDIM = 512;
-    private static final int DISPLAY_TIMEOUT_MS = 5000; // 5s
     protected static final boolean DEBUG = false;
     protected static final String TAG = "TransportControlView";
 
-    private View mLayout;
     private ImageView mAlbumArt;
     private TextView mTrackTitle;
-    private TextView mTrackAlbum;
-    private TextView mTrackArtist;
     private ImageView mBtnPrev;
     private ImageView mBtnPlay;
     private ImageView mBtnNext;
@@ -83,66 +75,70 @@ public class TransportControlView extends FrameLayout implements OnClickListener
     private AudioManager mAudioManager;
     private LockScreenWidgetCallback mWidgetCallbacks;
     private IRemoteControlDisplayWeak mIRCD;
-    private boolean mCirclesLock;
 
     /**
-     * The metadata which should be populated into the view once we've been attached
+     * The metadata which should be populated into the view once we've been
+     * attached
      */
     private Bundle mPopulateMetadataWhenAttached = null;
 
-    // This handler is required to ensure messages from IRCD are handled in sequence and on
+    // This handler is required to ensure messages from IRCD are handled in
+    // sequence and on
     // the UI thread.
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
-            case MSG_UPDATE_STATE:
-                if (mClientGeneration == msg.arg1) updatePlayPauseState(msg.arg2);
-                break;
+                case MSG_UPDATE_STATE:
+                    if (mClientGeneration == msg.arg1)
+                        updatePlayPauseState(msg.arg2);
+                    break;
 
-            case MSG_SET_METADATA:
-                if (mClientGeneration == msg.arg1) updateMetadata((Bundle) msg.obj);
-                break;
+                case MSG_SET_METADATA:
+                    if (mClientGeneration == msg.arg1)
+                        updateMetadata((Bundle) msg.obj);
+                    break;
 
-            case MSG_SET_TRANSPORT_CONTROLS:
-                if (mClientGeneration == msg.arg1) updateTransportControls(msg.arg2);
-                break;
+                case MSG_SET_TRANSPORT_CONTROLS:
+                    if (mClientGeneration == msg.arg1)
+                        updateTransportControls(msg.arg2);
+                    break;
 
-            case MSG_SET_ARTWORK:
-                if (mClientGeneration == msg.arg1) {
-                    if (mMetadata.bitmap != null) {
-                        mMetadata.bitmap.recycle();
+                case MSG_SET_ARTWORK:
+                    if (mClientGeneration == msg.arg1) {
+                        if (mMetadata.bitmap != null) {
+                            mMetadata.bitmap.recycle();
+                        }
+                        mMetadata.bitmap = (Bitmap) msg.obj;
+                        mAlbumArt.setImageBitmap(mMetadata.bitmap);
                     }
-                    mMetadata.bitmap = (Bitmap) msg.obj;
-                    mAlbumArt.setImageBitmap(mMetadata.bitmap);
-                    if (mCirclesLock) {
-                        mAlbumArt.setAlpha(0.5f);
-                    }
-                }
-                break;
+                    break;
 
-            case MSG_SET_GENERATION_ID:
-                if (msg.arg2 != 0) {
-                    // This means nobody is currently registered. Hide the view.
-                    if (mWidgetCallbacks != null) {
-                        mWidgetCallbacks.requestHide(TransportControlView.this);
+                case MSG_SET_GENERATION_ID:
+                    if (msg.arg2 != 0) {
+                        // This means nobody is currently registered. Hide the
+                        // view.
+                        if (mWidgetCallbacks != null) {
+                            mWidgetCallbacks.requestHide(TransportControlView.this);
+                        }
                     }
-                }
-                if (DEBUG) Log.v(TAG, "New genId = " + msg.arg1 + ", clearing = " + msg.arg2);
-                mClientGeneration = msg.arg1;
-                mClientIntent = (PendingIntent) msg.obj;
-                break;
+                    if (DEBUG)
+                        Log.v(TAG, "New genId = " + msg.arg1 + ", clearing = " + msg.arg2);
+                    mClientGeneration = msg.arg1;
+                    mClientIntent = (PendingIntent) msg.obj;
+                    break;
 
             }
         }
     };
 
     /**
-     * This class is required to have weak linkage to the current TransportControlView
-     * because the remote process can hold a strong reference to this binder object and
-     * we can't predict when it will be GC'd in the remote process. Without this code, it
-     * would allow a heavyweight object to be held on this side of the binder when there's
-     * no requirement to run a GC on the other side.
+     * This class is required to have weak linkage to the current
+     * TransportControlView because the remote process can hold a strong
+     * reference to this binder object and we can't predict when it will be GC'd
+     * in the remote process. Without this code, it would allow a heavyweight
+     * object to be held on this side of the binder when there's no requirement
+     * to run a GC on the other side.
      */
     private static class IRemoteControlDisplayWeak extends IRemoteControlDisplay.Stub {
         private WeakReference<Handler> mLocalHandler;
@@ -193,20 +189,19 @@ public class TransportControlView extends FrameLayout implements OnClickListener
             Handler handler = mLocalHandler.get();
             if (handler != null) {
                 handler.obtainMessage(MSG_SET_GENERATION_ID,
-                    clientGeneration, (clearing ? 1 : 0), mediaIntent).sendToTarget();
+                        clientGeneration, (clearing ? 1 : 0), mediaIntent).sendToTarget();
             }
         }
     };
 
     public TransportControlView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        if (DEBUG) Log.v(TAG, "Create TCV " + this);
+        if (DEBUG)
+            Log.v(TAG, "Create TCV " + this);
         mAudioManager = new AudioManager(mContext);
-        mCurrentPlayState = RemoteControlClient.PLAYSTATE_NONE; // until we get a callback
+        mCurrentPlayState = RemoteControlClient.PLAYSTATE_NONE; // until we get
+                                                                // a callback
         mIRCD = new IRemoteControlDisplayWeak(mHandler);
-        mCirclesLock = Settings.System.getBoolean(
-            context.getContentResolver(),
-            Settings.System.USE_CIRCLES_LOCKSCREEN, false);
     }
 
     private void updateTransportControls(int transportControlFlags) {
@@ -216,35 +211,15 @@ public class TransportControlView extends FrameLayout implements OnClickListener
     @Override
     public void onFinishInflate() {
         super.onFinishInflate();
-        if (Settings.System.getInt(mContext.getContentResolver(),
-                Settings.System.LOCKSCREEN_STOCK_MUSIC_LAYOUT, 0) == 0) {
-            mLayout = (View) findViewById(R.id.layout_stock);
-            mLayout.setVisibility(View.GONE);
-
-            mTrackTitle = (TextView) findViewById(R.id.title_aokp);
-            mTrackTitle.setSelected(true); // enable marquee
-            mTrackAlbum = (TextView) findViewById(R.id.album_aokp);
-            mTrackAlbum.setSelected(true); // enable marquee
-            mTrackArtist = (TextView) findViewById(R.id.artist_aokp);
-            mTrackArtist.setSelected(true); // enable marquee
-            mAlbumArt = (ImageView) findViewById(R.id.albumart_aokp);
-            mBtnPrev = (ImageView) findViewById(R.id.btn_prev_aokp);
-            mBtnPlay = (ImageView) findViewById(R.id.btn_play_aokp);
-            mBtnNext = (ImageView) findViewById(R.id.btn_next_aokp);
-        }
-        else {
-            mLayout = (View) findViewById(R.id.layout_aokp);
-            mLayout.setVisibility(View.GONE);
-
-            mTrackTitle = (TextView) findViewById(R.id.title_stock);
-            mTrackTitle.setSelected(true); // enable marquee
-            mAlbumArt = (ImageView) findViewById(R.id.albumart_stock);
-            mBtnPrev = (ImageView) findViewById(R.id.btn_prev_stock);
-            mBtnPlay = (ImageView) findViewById(R.id.btn_play_stock);
-            mBtnNext = (ImageView) findViewById(R.id.btn_next_stock);
-        }
-
-        final View buttons[] = { mBtnPrev, mBtnPlay, mBtnNext };
+        mTrackTitle = (TextView) findViewById(R.id.title);
+        mTrackTitle.setSelected(true); // enable marquee
+        mAlbumArt = (ImageView) findViewById(R.id.albumart);
+        mBtnPrev = (ImageView) findViewById(R.id.btn_prev);
+        mBtnPlay = (ImageView) findViewById(R.id.btn_play);
+        mBtnNext = (ImageView) findViewById(R.id.btn_next);
+        final View buttons[] = {
+                mBtnPrev, mBtnPlay, mBtnNext
+        };
         for (View view : buttons) {
             view.setOnClickListener(this);
         }
@@ -258,7 +233,8 @@ public class TransportControlView extends FrameLayout implements OnClickListener
             mPopulateMetadataWhenAttached = null;
         }
         if (!mAttached) {
-            if (DEBUG) Log.v(TAG, "Registering TCV " + this);
+            if (DEBUG)
+                Log.v(TAG, "Registering TCV " + this);
             mAudioManager.registerRemoteControlDisplay(mIRCD);
         }
         mAttached = true;
@@ -268,7 +244,8 @@ public class TransportControlView extends FrameLayout implements OnClickListener
     public void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         if (mAttached) {
-            if (DEBUG) Log.v(TAG, "Unregistering TCV " + this);
+            if (DEBUG)
+                Log.v(TAG, "Unregistering TCV " + this);
             mAudioManager.unregisterRemoteControlDisplay(mIRCD);
         }
         mAttached = false;
@@ -277,9 +254,9 @@ public class TransportControlView extends FrameLayout implements OnClickListener
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        int dim = Math.min(MAXDIM, Math.max(getWidth(), getHeight()));
-//        Log.v(TAG, "setting max bitmap size: " + dim + "x" + dim);
-//        mAudioManager.remoteControlDisplayUsesBitmapSize(mIRCD, dim, dim);
+        // int dim = Math.min(MAXDIM, Math.max(getWidth(), getHeight()));
+        // Log.v(TAG, "setting max bitmap size: " + dim + "x" + dim);
+        // mAudioManager.remoteControlDisplayUsesBitmapSize(mIRCD, dim, dim);
     }
 
     class Metadata {
@@ -289,7 +266,8 @@ public class TransportControlView extends FrameLayout implements OnClickListener
         private Bitmap bitmap;
 
         public String toString() {
-            return "Metadata[artist=" + artist + " trackTitle=" + trackTitle + " albumTitle=" + albumTitle + "]";
+            return "Metadata[artist=" + artist + " trackTitle=" + trackTitle + " albumTitle="
+                    + albumTitle + "]";
         }
     }
 
@@ -312,51 +290,45 @@ public class TransportControlView extends FrameLayout implements OnClickListener
      * Populates the given metadata into the view
      */
     private void populateMetadata() {
-        if (Settings.System.getInt(mContext.getContentResolver(), Settings.System.LOCKSCREEN_STOCK_MUSIC_LAYOUT, 0) == 0) {
-            mTrackTitle.setText(mMetadata.trackTitle);
-            mTrackAlbum.setText(mMetadata.albumTitle);
-            mTrackArtist.setText(mMetadata.artist);
+        StringBuilder sb = new StringBuilder();
+        int trackTitleLength = 0;
+        if (!TextUtils.isEmpty(mMetadata.trackTitle)) {
+            sb.append(mMetadata.trackTitle);
+            trackTitleLength = mMetadata.trackTitle.length();
         }
-        else {
-            StringBuilder sb = new StringBuilder();
-            int trackTitleLength = 0;
-            if (!TextUtils.isEmpty(mMetadata.trackTitle)) {
-                sb.append(mMetadata.trackTitle);
-                trackTitleLength = mMetadata.trackTitle.length();
+        if (!TextUtils.isEmpty(mMetadata.artist)) {
+            if (sb.length() != 0) {
+                sb.append(" - ");
             }
-            if (!TextUtils.isEmpty(mMetadata.artist)) {
-                if (sb.length() != 0) {
-                    sb.append(" - ");
-                }
-                sb.append(mMetadata.artist);
-            }
-            if (!TextUtils.isEmpty(mMetadata.albumTitle)) {
-                if (sb.length() != 0) {
-                    sb.append(" - ");
-                }
-                sb.append(mMetadata.albumTitle);
-            }
-            mTrackTitle.setText(sb.toString(), TextView.BufferType.SPANNABLE);
-            Spannable str = (Spannable) mTrackTitle.getText();
-            if (trackTitleLength != 0) {
-                str.setSpan(new ForegroundColorSpan(0xffffffff), 0, trackTitleLength,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-                trackTitleLength++;
-            }
-            if (sb.length() > trackTitleLength) {
-                str.setSpan(new ForegroundColorSpan(0x7fffffff), trackTitleLength, sb.length(),
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            }
+            sb.append(mMetadata.artist);
         }
+        if (!TextUtils.isEmpty(mMetadata.albumTitle)) {
+            if (sb.length() != 0) {
+                sb.append(" - ");
+            }
+            sb.append(mMetadata.albumTitle);
+        }
+        mTrackTitle.setText(sb.toString(), TextView.BufferType.SPANNABLE);
+        Spannable str = (Spannable) mTrackTitle.getText();
+        if (trackTitleLength != 0) {
+            str.setSpan(new ForegroundColorSpan(0xffffffff), 0, trackTitleLength,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            trackTitleLength++;
+        }
+        if (sb.length() > trackTitleLength) {
+            str.setSpan(new ForegroundColorSpan(0x7fffffff), trackTitleLength, sb.length(),
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+
         mAlbumArt.setImageBitmap(mMetadata.bitmap);
         final int flags = mTransportControlFlags;
         setVisibilityBasedOnFlag(mBtnPrev, flags, RemoteControlClient.FLAG_KEY_MEDIA_PREVIOUS);
         setVisibilityBasedOnFlag(mBtnNext, flags, RemoteControlClient.FLAG_KEY_MEDIA_NEXT);
         setVisibilityBasedOnFlag(mBtnPlay, flags,
                 RemoteControlClient.FLAG_KEY_MEDIA_PLAY
-                | RemoteControlClient.FLAG_KEY_MEDIA_PAUSE
-                | RemoteControlClient.FLAG_KEY_MEDIA_PLAY_PAUSE
-                | RemoteControlClient.FLAG_KEY_MEDIA_STOP);
+                        | RemoteControlClient.FLAG_KEY_MEDIA_PAUSE
+                        | RemoteControlClient.FLAG_KEY_MEDIA_PLAY_PAUSE
+                        | RemoteControlClient.FLAG_KEY_MEDIA_STOP);
 
         updatePlayPauseState(mCurrentPlayState);
     }
@@ -370,8 +342,9 @@ public class TransportControlView extends FrameLayout implements OnClickListener
     }
 
     private void updatePlayPauseState(int state) {
-        if (DEBUG) Log.v(TAG,
-                "updatePlayPauseState(), old=" + mCurrentPlayState + ", state=" + state);
+        if (DEBUG)
+            Log.v(TAG,
+                    "updatePlayPauseState(), old=" + mCurrentPlayState + ", state=" + state);
         if (state == mCurrentPlayState) {
             return;
         }
@@ -381,8 +354,10 @@ public class TransportControlView extends FrameLayout implements OnClickListener
         switch (state) {
             case RemoteControlClient.PLAYSTATE_ERROR:
                 imageResId = com.android.internal.R.drawable.stat_sys_warning;
-                // TODO use more specific image description string for warning, but here the "play"
-                //      message is still valid because this button triggers a play command.
+                // TODO use more specific image description string for warning,
+                // but here the "play"
+                // message is still valid because this button triggers a play
+                // command.
                 imageDescId = com.android.internal.R.string.lockscreen_transport_play_description;
                 break;
 
@@ -431,8 +406,7 @@ public class TransportControlView extends FrameLayout implements OnClickListener
             out.writeInt(this.wasShowing ? 1 : 0);
         }
 
-        public static final Parcelable.Creator<SavedState> CREATOR
-                = new Parcelable.Creator<SavedState>() {
+        public static final Parcelable.Creator<SavedState> CREATOR = new Parcelable.Creator<SavedState>() {
             public SavedState createFromParcel(Parcel in) {
                 return new SavedState(in);
             }
@@ -445,7 +419,8 @@ public class TransportControlView extends FrameLayout implements OnClickListener
 
     @Override
     public Parcelable onSaveInstanceState() {
-        if (DEBUG) Log.v(TAG, "onSaveInstanceState()");
+        if (DEBUG)
+            Log.v(TAG, "onSaveInstanceState()");
         Parcelable superState = super.onSaveInstanceState();
         SavedState ss = new SavedState(superState);
         ss.wasShowing = mWidgetCallbacks != null && mWidgetCallbacks.isVisible(this);
@@ -454,7 +429,8 @@ public class TransportControlView extends FrameLayout implements OnClickListener
 
     @Override
     public void onRestoreInstanceState(Parcelable state) {
-        if (DEBUG) Log.v(TAG, "onRestoreInstanceState()");
+        if (DEBUG)
+            Log.v(TAG, "onRestoreInstanceState()");
         if (!(state instanceof SavedState)) {
             super.onRestoreInstanceState(state);
             return;
@@ -486,19 +462,21 @@ public class TransportControlView extends FrameLayout implements OnClickListener
 
     private void sendMediaButtonClick(int keyCode) {
         if (mClientIntent == null) {
-            // Shouldn't be possible because this view should be hidden in this case.
+            // Shouldn't be possible because this view should be hidden in this
+            // case.
             Log.e(TAG, "sendMediaButtonClick(): No client is currently registered");
             return;
         }
-        // use the registered PendingIntent that will be processed by the registered
-        //    media button event receiver, which is the component of mClientIntent
+        // use the registered PendingIntent that will be processed by the
+        // registered
+        // media button event receiver, which is the component of mClientIntent
         KeyEvent keyEvent = new KeyEvent(KeyEvent.ACTION_DOWN, keyCode);
         Intent intent = new Intent(Intent.ACTION_MEDIA_BUTTON);
         intent.putExtra(Intent.EXTRA_KEY_EVENT, keyEvent);
         try {
             mClientIntent.send(getContext(), 0, intent);
         } catch (CanceledException e) {
-            Log.e(TAG, "Error sending intent for media button down: "+e);
+            Log.e(TAG, "Error sending intent for media button down: " + e);
             e.printStackTrace();
         }
 
@@ -508,7 +486,7 @@ public class TransportControlView extends FrameLayout implements OnClickListener
         try {
             mClientIntent.send(getContext(), 0, intent);
         } catch (CanceledException e) {
-            Log.e(TAG, "Error sending intent for media button up: "+e);
+            Log.e(TAG, "Error sending intent for media button up: " + e);
             e.printStackTrace();
         }
     }
@@ -519,35 +497,5 @@ public class TransportControlView extends FrameLayout implements OnClickListener
 
     public boolean providesClock() {
         return false;
-    }
-
-    private boolean wasPlayingRecently(int state, long stateChangeTimeMs) {
-        switch (state) {
-            case RemoteControlClient.PLAYSTATE_PLAYING:
-            case RemoteControlClient.PLAYSTATE_FAST_FORWARDING:
-            case RemoteControlClient.PLAYSTATE_REWINDING:
-            case RemoteControlClient.PLAYSTATE_SKIPPING_FORWARDS:
-            case RemoteControlClient.PLAYSTATE_SKIPPING_BACKWARDS:
-            case RemoteControlClient.PLAYSTATE_BUFFERING:
-                // actively playing or about to play
-                return true;
-            case RemoteControlClient.PLAYSTATE_NONE:
-                return false;
-            case RemoteControlClient.PLAYSTATE_STOPPED:
-            case RemoteControlClient.PLAYSTATE_PAUSED:
-            case RemoteControlClient.PLAYSTATE_ERROR:
-                // we have stopped playing, check how long ago
-                if (DEBUG) {
-                    if ((SystemClock.elapsedRealtime() - stateChangeTimeMs) < DISPLAY_TIMEOUT_MS) {
-                        Log.v(TAG, "wasPlayingRecently: time < TIMEOUT was playing recently");
-                    } else {
-                        Log.v(TAG, "wasPlayingRecently: time > TIMEOUT");
-                    }
-                }
-                return ((SystemClock.elapsedRealtime() - stateChangeTimeMs) < DISPLAY_TIMEOUT_MS);
-            default:
-                Log.e(TAG, "Unknown playback state " + state + " in wasPlayingRecently()");
-                return false;
-        }
     }
 }

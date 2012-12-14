@@ -30,8 +30,8 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
 import android.os.ServiceManager;
-import android.util.Log;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 
@@ -40,7 +40,6 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * The Camera class is used to set image capture settings, start/stop preview,
@@ -1823,7 +1822,6 @@ public class Camera {
         private static final String KEY_PREVIEW_FPS_RANGE = "preview-fps-range";
         private static final String KEY_PREVIEW_FRAME_RATE_MODE = "preview-frame-rate-mode";
         private static final String KEY_PREVIEW_FRAME_RATE_AUTO_MODE = "frame-rate-auto";
-        private static final String KEY_PREVIEW_FRAME_RATE_FIXED_MODE = "frame-rate-fixed";
         private static final String KEY_PICTURE_SIZE = "picture-size";
         private static final String KEY_PICTURE_FORMAT = "picture-format";
         private static final String KEY_JPEG_THUMBNAIL_SIZE = "jpeg-thumbnail-size";
@@ -1882,7 +1880,6 @@ public class Camera {
         private static final String KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO =
                                             "preferred-preview-size-for-video";
         private static final String KEY_MAX_NUM_DETECTED_FACES_HW = "max-num-detected-faces-hw";
-        private static final String KEY_MAX_NUM_DETECTED_FACES_SW = "max-num-detected-faces-sw";
         private static final String KEY_RECORDING_HINT = "recording-hint";
         private static final String KEY_VIDEO_SNAPSHOT_SUPPORTED = "video-snapshot-supported";
         private static final String KEY_FULL_VIDEO_SNAP_SUPPORTED = "full-video-snap-supported";
@@ -2275,15 +2272,11 @@ public class Camera {
         // Formats for setPreviewFormat and setPictureFormat.
         private static final String PIXEL_FORMAT_YUV422SP = "yuv422sp";
         private static final String PIXEL_FORMAT_YUV420SP = "yuv420sp";
-        private static final String PIXEL_FORMAT_YUV420SP_ADRENO = "yuv420sp-adreno";
         private static final String PIXEL_FORMAT_YUV422I = "yuv422i-yuyv";
         private static final String PIXEL_FORMAT_YUV420P = "yuv420p";
         private static final String PIXEL_FORMAT_RGB565 = "rgb565";
         private static final String PIXEL_FORMAT_JPEG = "jpeg";
         private static final String PIXEL_FORMAT_BAYER_RGGB = "bayer-rggb";
-        private static final String PIXEL_FORMAT_RAW = "raw";
-        private static final String PIXEL_FORMAT_YV12 = "yv12";
-        private static final String PIXEL_FORMAT_NV12 = "nv12";
 
         //Values for Continuous AF
 
@@ -4838,21 +4831,6 @@ public class Camera {
             }
 
             return result;
-        }
-
-	// Splits a comma delimited string to an ArrayList of Coordinate.
-        // Return null if the passing string is null or the Coordinate is 0.
-        private ArrayList<Coordinate> splitCoordinate(String str) {
-            if (str == null) return null;
-
-            StringTokenizer tokenizer = new StringTokenizer(str, ",");
-            ArrayList<Coordinate> coordinateList = new ArrayList<Coordinate>();
-            while (tokenizer.hasMoreElements()) {
-                Coordinate c = strToCoordinate(tokenizer.nextToken());
-                if (c != null) coordinateList.add(c);
-            }
-            if (coordinateList.size() == 0) return null;
-            return coordinateList;
         }
 
         // Parses a string (ex: "500x500") to Coordinate object.

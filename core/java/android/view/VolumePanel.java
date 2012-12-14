@@ -22,13 +22,11 @@ import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface.OnDismissListener;
 import android.content.BroadcastReceiver;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
-import android.database.ContentObserver;
 import android.media.AudioManager;
 import android.media.AudioService;
 import android.media.AudioSystem;
@@ -38,7 +36,6 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Vibrator;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.WindowManager.LayoutParams;
 import android.widget.ImageView;
@@ -48,14 +45,12 @@ import android.widget.SeekBar.OnSeekBarChangeListener;
 import java.util.HashMap;
 
 /**
- * Handle the volume up and down keys.
- *
- * This code really should be moved elsewhere.
- *
- * Seriously, it really really should be moved elsewhere.  This is used by
- * android.media.AudioService, which actually runs in the system process, to
- * show the volume dialog when the user changes the volume.  What a mess.
- *
+ * Handle the volume up and down keys. This code really should be moved
+ * elsewhere. Seriously, it really really should be moved elsewhere. This is
+ * used by android.media.AudioService, which actually runs in the system
+ * process, to show the volume dialog when the user changes the volume. What a
+ * mess.
+ * 
  * @hide
  */
 public class VolumePanel extends Handler implements OnSeekBarChangeListener, View.OnClickListener
@@ -100,24 +95,25 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
 
     // Pseudo stream type for master volume
     private static final int STREAM_MASTER = -100;
-    // Pseudo stream type for remote volume is defined in AudioService.STREAM_REMOTE_MUSIC
+    // Pseudo stream type for remote volume is defined in
+    // AudioService.STREAM_REMOTE_MUSIC
 
     protected Context mContext;
     private AudioManager mAudioManager;
     protected AudioService mAudioService;
     private boolean mRingIsSilent;
     private boolean mShowCombinedVolumes;
+    private boolean mVoiceCapable;
 
-    // True if we want to play tones on the system stream when the master stream is specified.
-    private boolean mPlayMasterStreamTones;
+    // True if we want to play tones on the system stream when the master stream
+    // is specified.
+    private final boolean mPlayMasterStreamTones;
 
     /** Dialog containing all the sliders */
     private final Dialog mDialog;
     /** Dialog's content view */
     private final View mView;
 
-    /** The visible portion of the volume overlay */
-    private final ViewGroup mPanel;
     /** Contains the sliders and their touchable icons */
     private final ViewGroup mSliderGroup;
     /** The button that expands the dialog to show all sliders */
@@ -129,33 +125,6 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     private int mActiveStreamType = -1;
     /** All the slider controls mapped by stream type */
     private HashMap<Integer, StreamControl> mStreamControls;
-
-    /** Used by the observer */
-    private Handler mHandler;
-
-    private boolean mRingerAndNotificationStreamsLinked = true;
-
-    /** Watch over the toggle in order to update when user changes preference */
-    class SettingsObserver extends ContentObserver {
-
-        public SettingsObserver(Handler handler) {
-            super(handler);
-        }
-
-        void observe() {
-            ContentResolver resolver = mContext.getContentResolver();
-            resolver.registerContentObserver(
-                    Settings.System.getUriFor(Settings.System.ENABLE_VOLUME_OPTIONS), false, this);
-            resolver.registerContentObserver(
-                    Settings.System.getUriFor(Settings.System.VOLUME_LINK_NOTIFICATION), false, this);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            updateSettings();
-        }
-
-    }
 
     private enum StreamResources {
         BluetoothSCOStream(AudioManager.STREAM_BLUETOOTH_SCO,
@@ -170,10 +139,15 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
                 false),
         VoiceStream(AudioManager.STREAM_VOICE_CALL,
                 R.string.volume_icon_description_incall,
-                R.drawable.ic_audio_phone, R.drawable.ic_audio_phone, false), AlarmStream(
-                AudioManager.STREAM_ALARM, R.string.volume_alarm,
-                R.drawable.ic_audio_alarm, R.drawable.ic_audio_alarm_mute, true), MediaStream(
-                AudioManager.STREAM_MUSIC,
+                R.drawable.ic_audio_phone,
+                R.drawable.ic_audio_phone,
+                false),
+        AlarmStream(AudioManager.STREAM_ALARM,
+                R.string.volume_alarm,
+                R.drawable.ic_audio_alarm,
+                R.drawable.ic_audio_alarm_mute,
+                false),
+        MediaStream(AudioManager.STREAM_MUSIC,
                 R.string.volume_icon_description_media,
                 R.drawable.ic_audio_vol,
                 R.drawable.ic_audio_vol_mute,
@@ -185,12 +159,14 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
                 true),
         // for now, use media resources for master volume
         MasterStream(STREAM_MASTER,
-                R.string.volume_icon_description_media, //FIXME should have its own description
+                R.string.volume_icon_description_media, // FIXME should have its
+                                                        // own description
                 R.drawable.ic_audio_vol,
                 R.drawable.ic_audio_vol_mute,
                 false),
         RemoteStream(AudioService.STREAM_REMOTE_MUSIC,
-                R.string.volume_icon_description_media, //FIXME should have its own description
+                R.string.volume_icon_description_media, // FIXME should have its
+                                                        // own description
                 R.drawable.ic_media_route_on_holo_dark,
                 R.drawable.ic_media_route_disabled_holo_dark,
                 false);// will be dynamically updated
@@ -199,7 +175,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
         int descRes;
         int iconRes;
         int iconMuteRes;
-        // RING, VOICE_CALL & BLUETOOTH_SCO are hidden unless explicitly requested
+        // RING, VOICE_CALL & BLUETOOTH_SCO are hidden unless explicitly
+        // requested
         boolean show;
 
         StreamResources(int streamType, int descRes, int iconRes, int iconMuteRes, boolean show) {
@@ -213,14 +190,14 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
 
     // List of stream types and their order
     private static final StreamResources[] STREAMS = {
-        StreamResources.BluetoothSCOStream,
-        StreamResources.RingerStream,
-        StreamResources.VoiceStream,
-        StreamResources.MediaStream,
-        StreamResources.NotificationStream,
-        StreamResources.AlarmStream,
-        StreamResources.MasterStream,
-        StreamResources.RemoteStream
+            StreamResources.BluetoothSCOStream,
+            StreamResources.RingerStream,
+            StreamResources.VoiceStream,
+            StreamResources.MediaStream,
+            StreamResources.NotificationStream,
+            StreamResources.AlarmStream,
+            StreamResources.MasterStream,
+            StreamResources.RemoteStream
     };
 
     /** Object that contains data for each slider */
@@ -268,11 +245,20 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
         }
     }
 
-
     public VolumePanel(final Context context, AudioService volumeService) {
         mContext = context;
         mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         mAudioService = volumeService;
+
+        // For now, only show master volume if master volume is supported
+        boolean useMasterVolume = context.getResources().getBoolean(
+                com.android.internal.R.bool.config_useMasterVolume);
+        if (useMasterVolume) {
+            for (int i = 0; i < STREAMS.length; i++) {
+                StreamResources streamRes = STREAMS[i];
+                streamRes.show = (streamRes.streamType == STREAM_MASTER);
+            }
+        }
 
         LayoutInflater inflater = (LayoutInflater) context
                 .getSystemService(Context.LAYOUT_INFLATER_SERVICE);
@@ -283,7 +269,6 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
                 return false;
             }
         });
-        mPanel = (ViewGroup) mView.findViewById(R.id.visible_panel);
         mSliderGroup = (ViewGroup) mView.findViewById(R.id.slider_group);
         mMoreButton = (ImageView) mView.findViewById(R.id.expand_button);
         mDivider = (ImageView) mView.findViewById(R.id.expand_button_divider);
@@ -321,43 +306,20 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
                 | LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH);
 
         mToneGenerators = new ToneGenerator[AudioSystem.getNumStreamTypes()];
-        mVibrator = (Vibrator)context.getSystemService(Context.VIBRATOR_SERVICE);
+        mVibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
 
-        mShowCombinedVolumes = Settings.System.getInt(
-                mContext.getContentResolver(),
-                Settings.System.ENABLE_VOLUME_OPTIONS, 0) == 1
-                || !context.getResources().getBoolean(R.bool.config_voice_capable);
-        toggleMore(mShowCombinedVolumes);
-
-        mHandler = new Handler();
-        SettingsObserver settingsObserver = new SettingsObserver(mHandler);
-        settingsObserver.observe();
-        listenToRingerMode();
-    }
-
-    /** Used by the observer to update the most recent settings */
-    public void updateSettings() {
-        ContentResolver resolver = mContext.getContentResolver();
-        mShowCombinedVolumes = Settings.System.getInt(
-                resolver,
-                Settings.System.ENABLE_VOLUME_OPTIONS, 0) == 1;
-        mRingerAndNotificationStreamsLinked = Settings.System.getInt(
-                resolver,
-                Settings.System.VOLUME_LINK_NOTIFICATION, 1) == 1;
-        toggleMore(mShowCombinedVolumes);
-    }
-
-    private void toggleMore(boolean toggle) {
+        mVoiceCapable = context.getResources().getBoolean(R.bool.config_voice_capable);
+        mShowCombinedVolumes = !mVoiceCapable && !useMasterVolume;
         // If we don't want to show multiple volumes, hide the settings button
         // and divider
-        if (!toggle) {
+        if (!mShowCombinedVolumes) {
             mMoreButton.setVisibility(View.GONE);
             mDivider.setVisibility(View.GONE);
         } else {
             mMoreButton.setOnClickListener(this);
         }
 
-        boolean masterVolumeOnly = mContext.getResources().getBoolean(
+        boolean masterVolumeOnly = context.getResources().getBoolean(
                 com.android.internal.R.bool.config_useMasterVolume);
         boolean masterVolumeKeySounds = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_useVolumeKeySounds);
@@ -431,6 +393,9 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
         for (int i = 0; i < STREAMS.length; i++) {
             StreamResources streamRes = STREAMS[i];
             int streamType = streamRes.streamType;
+            if (mVoiceCapable && streamRes == StreamResources.NotificationStream) {
+                streamRes = StreamResources.RingerStream;
+            }
             StreamControl sc = new StreamControl();
             sc.streamType = streamType;
             sc.group = (ViewGroup) inflater.inflate(R.layout.volume_adjust_item, null);
@@ -469,7 +434,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     }
 
     private void addOtherVolumes() {
-        if (!mShowCombinedVolumes) return;
+        if (!mShowCombinedVolumes)
+            return;
 
         for (int i = 0; i < STREAMS.length; i++) {
             // Skip the phone specific ones and the active one
@@ -493,7 +459,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
             sc.icon.setImageResource(R.drawable.ic_audio_ring_notif_vibrate);
         }
         if (sc.streamType == AudioService.STREAM_REMOTE_MUSIC) {
-            // never disable touch interactions for remote playback, the muting is not tied to
+            // never disable touch interactions for remote playback, the muting
+            // is not tied to
             // the state of the phone.
             sc.seekbarView.setEnabled(true);
         } else if (sc.streamType != mAudioManager.getMasterStreamType() && muted) {
@@ -501,10 +468,6 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
         } else {
             sc.seekbarView.setEnabled(true);
         }
-    }
-
-    private boolean isExpanded() {
-        return mMoreButton.getVisibility() != View.VISIBLE;
     }
 
     private void expand() {
@@ -534,7 +497,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     }
 
     public void postVolumeChanged(int streamType, int flags) {
-        if (hasMessages(MSG_VOLUME_CHANGED)) return;
+        if (hasMessages(MSG_VOLUME_CHANGED))
+            return;
         synchronized (this) {
             if (mStreamControls == null) {
                 createSliders();
@@ -545,7 +509,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     }
 
     public void postRemoteVolumeChanged(int streamType, int flags) {
-        if (hasMessages(MSG_REMOTE_VOLUME_CHANGED)) return;
+        if (hasMessages(MSG_REMOTE_VOLUME_CHANGED))
+            return;
         synchronized (this) {
             if (mStreamControls == null) {
                 createSliders();
@@ -561,20 +526,23 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     }
 
     /**
-     * Called by AudioService when it has received new remote playback information that
-     * would affect the VolumePanel display (mainly volumes). The difference with
-     * {@link #postRemoteVolumeChanged(int, int)} is that the handling of the posted message
-     * (MSG_REMOTE_VOLUME_UPDATE_IF_SHOWN) will only update the volume slider if it is being
-     * displayed.
-     * This special code path is due to the fact that remote volume updates arrive to AudioService
-     * asynchronously. So after AudioService has sent the volume update (which should be treated
-     * as a request to update the volume), the application will likely set a new volume. If the UI
-     * is still up, we need to refresh the display to show this new value.
+     * Called by AudioService when it has received new remote playback
+     * information that would affect the VolumePanel display (mainly volumes).
+     * The difference with {@link #postRemoteVolumeChanged(int, int)} is that
+     * the handling of the posted message (MSG_REMOTE_VOLUME_UPDATE_IF_SHOWN)
+     * will only update the volume slider if it is being displayed. This special
+     * code path is due to the fact that remote volume updates arrive to
+     * AudioService asynchronously. So after AudioService has sent the volume
+     * update (which should be treated as a request to update the volume), the
+     * application will likely set a new volume. If the UI is still up, we need
+     * to refresh the display to show this new value.
      */
     public void postHasNewRemotePlaybackInfo() {
-        if (hasMessages(MSG_REMOTE_VOLUME_UPDATE_IF_SHOWN)) return;
-        // don't create or prevent resources to be freed, if they disappear, this update came too
-        //   late and shouldn't warrant the panel to be displayed longer
+        if (hasMessages(MSG_REMOTE_VOLUME_UPDATE_IF_SHOWN))
+            return;
+        // don't create or prevent resources to be freed, if they disappear,
+        // this update came too
+        // late and shouldn't warrant the panel to be displayed longer
         obtainMessage(MSG_REMOTE_VOLUME_UPDATE_IF_SHOWN).sendToTarget();
     }
 
@@ -583,7 +551,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     }
 
     public void postMuteChanged(int streamType, int flags) {
-        if (hasMessages(MSG_VOLUME_CHANGED)) return;
+        if (hasMessages(MSG_VOLUME_CHANGED))
+            return;
         synchronized (this) {
             if (mStreamControls == null) {
                 createSliders();
@@ -598,7 +567,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     }
 
     public void postDisplaySafeVolumeWarning() {
-        if (hasMessages(MSG_DISPLAY_SAFE_VOLUME_WARNING)) return;
+        if (hasMessages(MSG_DISPLAY_SAFE_VOLUME_WARNING))
+            return;
         obtainMessage(MSG_DISPLAY_SAFE_VOLUME_WARNING, 0, 0).sendToTarget();
     }
 
@@ -609,7 +579,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
      */
     protected void onVolumeChanged(int streamType, int flags) {
 
-        if (LOGD) Log.d(TAG, "onVolumeChanged(streamType: " + streamType + ", flags: " + flags + ")");
+        if (LOGD)
+            Log.d(TAG, "onVolumeChanged(streamType: " + streamType + ", flags: " + flags + ")");
 
         if ((flags & AudioManager.FLAG_SHOW_UI) != 0) {
             synchronized (this) {
@@ -620,7 +591,7 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
             }
         }
 
-        if ((flags & AudioManager.FLAG_PLAY_SOUND) != 0 && ! mRingIsSilent) {
+        if ((flags & AudioManager.FLAG_PLAY_SOUND) != 0 && !mRingIsSilent) {
             removeMessages(MSG_PLAY_SOUND);
             sendMessageDelayed(obtainMessage(MSG_PLAY_SOUND, streamType, flags), PLAY_SOUND_DELAY);
         }
@@ -639,7 +610,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
 
     protected void onMuteChanged(int streamType, int flags) {
 
-        if (LOGD) Log.d(TAG, "onMuteChanged(streamType: " + streamType + ", flags: " + flags + ")");
+        if (LOGD)
+            Log.d(TAG, "onMuteChanged(streamType: " + streamType + ", flags: " + flags + ")");
 
         StreamControl sc = mStreamControls.get(streamType);
         if (sc != null) {
@@ -666,7 +638,7 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
         switch (streamType) {
 
             case AudioManager.STREAM_RING: {
-//                setRingerIcon();
+                // setRingerIcon();
                 Uri ringuri = RingtoneManager.getActualDefaultRingtoneUri(
                         mContext, RingtoneManager.TYPE_RINGTONE);
                 if (ringuri == null) {
@@ -677,10 +649,9 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
 
             case AudioManager.STREAM_MUSIC: {
                 // Special case for when Bluetooth is active for music
-                if ((mAudioManager.getDevicesForStream(AudioManager.STREAM_MUSIC) &
-                        (AudioManager.DEVICE_OUT_BLUETOOTH_A2DP |
-                        AudioManager.DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
-                        AudioManager.DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER)) != 0) {
+                if ((mAudioManager.getDevicesForStream(AudioManager.STREAM_MUSIC) & (AudioManager.DEVICE_OUT_BLUETOOTH_A2DP
+                        |
+                        AudioManager.DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES | AudioManager.DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER)) != 0) {
                     setMusicIcon(R.drawable.ic_audio_bt, R.drawable.ic_audio_bt_mute);
                 } else {
                     setMusicIcon(R.drawable.ic_audio_vol, R.drawable.ic_audio_vol_mute);
@@ -691,8 +662,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
             case AudioManager.STREAM_VOICE_CALL: {
                 /*
                  * For in-call voice call volume, there is no inaudible volume.
-                 * Rescale the UI control so the progress bar doesn't go all
-                 * the way to zero and don't show the mute icon.
+                 * Rescale the UI control so the progress bar doesn't go all the
+                 * way to zero and don't show the mute icon.
                  */
                 index++;
                 max++;
@@ -715,8 +686,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
             case AudioManager.STREAM_BLUETOOTH_SCO: {
                 /*
                  * For in-call voice call volume, there is no inaudible volume.
-                 * Rescale the UI control so the progress bar doesn't go all
-                 * the way to zero and don't show the mute icon.
+                 * Rescale the UI control so the progress bar doesn't go all the
+                 * way to zero and don't show the mute icon.
                  */
                 index++;
                 max++;
@@ -724,7 +695,9 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
             }
 
             case AudioService.STREAM_REMOTE_MUSIC: {
-                if (LOGD) { Log.d(TAG, "showing remote volume "+index+" over "+ max); }
+                if (LOGD) {
+                    Log.d(TAG, "showing remote volume " + index + " over " + max);
+                }
                 break;
             }
         }
@@ -738,8 +711,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
             sc.seekbarView.setProgress(index);
             if (((flags & AudioManager.FLAG_FIXED_VOLUME) != 0) ||
                     (streamType != mAudioManager.getMasterStreamType() &&
-                     streamType != AudioService.STREAM_REMOTE_MUSIC &&
-                     isMuted(streamType))) {
+                            streamType != AudioService.STREAM_REMOTE_MUSIC &&
+                    isMuted(streamType))) {
                 sc.seekbarView.setEnabled(false);
             } else {
                 sc.seekbarView.setEnabled(true);
@@ -748,7 +721,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
 
         if (!mDialog.isShowing()) {
             int stream = (streamType == AudioService.STREAM_REMOTE_MUSIC) ? -1 : streamType;
-            // when the stream is for remote playback, use -1 to reset the stream type evaluation
+            // when the stream is for remote playback, use -1 to reset the
+            // stream type evaluation
             mAudioManager.forceVolumeControlStream(stream);
             mDialog.setContentView(mView);
             // Showing dialog - use collapsed state
@@ -768,11 +742,7 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     }
 
     protected void onPlaySound(int streamType, int flags) {
-        // If preference is no sound - just exit here
-        if (Settings.System.getInt(mContext.getContentResolver(),
-             Settings.System.VOLUME_ADJUST_SOUNDS_ENABLED, 1) == 0) {
-             return;
-        }
+
         if (hasMessages(MSG_STOP_SOUNDS)) {
             removeMessages(MSG_STOP_SOUNDS);
             // Force stop right now
@@ -812,10 +782,13 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     }
 
     protected void onRemoteVolumeChanged(int streamType, int flags) {
-        // streamType is the real stream type being affected, but for the UI sliders, we
-        // refer to AudioService.STREAM_REMOTE_MUSIC. We still play the beeps on the real
+        // streamType is the real stream type being affected, but for the UI
+        // sliders, we
+        // refer to AudioService.STREAM_REMOTE_MUSIC. We still play the beeps on
+        // the real
         // stream type.
-        if (LOGD) Log.d(TAG, "onRemoteVolumeChanged(stream:"+streamType+", flags: " + flags + ")");
+        if (LOGD)
+            Log.d(TAG, "onRemoteVolumeChanged(stream:" + streamType + ", flags: " + flags + ")");
 
         if (((flags & AudioManager.FLAG_SHOW_UI) != 0) || mDialog.isShowing()) {
             synchronized (this) {
@@ -825,10 +798,11 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
                 onShowVolumeChanged(AudioService.STREAM_REMOTE_MUSIC, flags);
             }
         } else {
-            if (LOGD) Log.d(TAG, "not calling onShowVolumeChanged(), no FLAG_SHOW_UI or no UI");
+            if (LOGD)
+                Log.d(TAG, "not calling onShowVolumeChanged(), no FLAG_SHOW_UI or no UI");
         }
 
-        if ((flags & AudioManager.FLAG_PLAY_SOUND) != 0 && ! mRingIsSilent) {
+        if ((flags & AudioManager.FLAG_PLAY_SOUND) != 0 && !mRingIsSilent) {
             removeMessages(MSG_PLAY_SOUND);
             sendMessageDelayed(obtainMessage(MSG_PLAY_SOUND, streamType, flags), PLAY_SOUND_DELAY);
         }
@@ -846,7 +820,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     }
 
     protected void onRemoteVolumeUpdateIfShown() {
-        if (LOGD) Log.d(TAG, "onRemoteVolumeUpdateIfShown()");
+        if (LOGD)
+            Log.d(TAG, "onRemoteVolumeUpdateIfShown()");
         if (mDialog.isShowing()
                 && (mActiveStreamType == AudioService.STREAM_REMOTE_MUSIC)
                 && (mStreamControls != null)) {
@@ -854,18 +829,18 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
         }
     }
 
-
     /**
-     * Handler for MSG_SLIDER_VISIBILITY_CHANGED
-     * Hide or show a slider
-     * @param streamType can be a valid stream type value, or VolumePanel.STREAM_MASTER,
-     *                   or AudioService.STREAM_REMOTE_MUSIC
+     * Handler for MSG_SLIDER_VISIBILITY_CHANGED Hide or show a slider
+     * 
+     * @param streamType can be a valid stream type value, or
+     *            VolumePanel.STREAM_MASTER, or AudioService.STREAM_REMOTE_MUSIC
      * @param visible
      */
     synchronized protected void onSliderVisibilityChanged(int streamType, int visible) {
-        if (LOGD) Log.d(TAG, "onSliderVisibilityChanged(stream="+streamType+", visi="+visible+")");
+        if (LOGD)
+            Log.d(TAG, "onSliderVisibilityChanged(stream=" + streamType + ", visi=" + visible + ")");
         boolean isVisible = (visible == 1);
-        for (int i = STREAMS.length - 1 ; i >= 0 ; i--) {
+        for (int i = STREAMS.length - 1; i >= 0; i--) {
             StreamResources streamRes = STREAMS[i];
             if (streamRes.streamType == streamType) {
                 streamRes.show = isVisible;
@@ -885,11 +860,11 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
             sConfirmSafeVolumeDialog = new AlertDialog.Builder(mContext)
                     .setMessage(com.android.internal.R.string.safe_media_volume_warning)
                     .setPositiveButton(com.android.internal.R.string.yes,
-                                        new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int which) {
-                            mAudioService.disableSafeMediaVolume();
-                        }
-                    })
+                            new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int which) {
+                                    mAudioService.disableSafeMediaVolume();
+                                }
+                            })
                     .setNegativeButton(com.android.internal.R.string.no, null)
                     .setIconAttribute(android.R.attr.alertDialogIcon)
                     .create();
@@ -898,18 +873,21 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
 
             sConfirmSafeVolumeDialog.setOnDismissListener(warning);
             sConfirmSafeVolumeDialog.getWindow().setType(
-                                                    WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
+                    WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
             sConfirmSafeVolumeDialog.show();
         }
     }
 
     /**
-     * Lock on this VolumePanel instance as long as you use the returned ToneGenerator.
+     * Lock on this VolumePanel instance as long as you use the returned
+     * ToneGenerator.
      */
     private ToneGenerator getOrCreateToneGenerator(int streamType) {
         if (streamType == STREAM_MASTER) {
-            // For devices that use the master volume setting only but still want to
-            // play a volume-changed tone, direct the master volume pseudostream to
+            // For devices that use the master volume setting only but still
+            // want to
+            // play a volume-changed tone, direct the master volume pseudostream
+            // to
             // the system stream's tone generator.
             if (mPlayMasterStreamTones) {
                 streamType = AudioManager.STREAM_SYSTEM;
@@ -932,10 +910,9 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
         }
     }
 
-
     /**
-     * Switch between icons because Bluetooth music is same as music volume, but with
-     * different icons.
+     * Switch between icons because Bluetooth music is same as music volume, but
+     * with different icons.
      */
     private void setMusicIcon(int resId, int resMuteId) {
         StreamControl sc = mStreamControls.get(AudioManager.STREAM_MUSIC);
@@ -1053,10 +1030,14 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
         final Object tag = seekBar.getTag();
         if (tag instanceof StreamControl) {
             StreamControl sc = (StreamControl) tag;
-            // because remote volume updates are asynchronous, AudioService might have received
-            // a new remote volume value since the finger adjusted the slider. So when the
-            // progress of the slider isn't being tracked anymore, adjust the slider to the last
-            // "published" remote volume value, so the UI reflects the actual volume.
+            // because remote volume updates are asynchronous, AudioService
+            // might have received
+            // a new remote volume value since the finger adjusted the slider.
+            // So when the
+            // progress of the slider isn't being tracked anymore, adjust the
+            // slider to the last
+            // "published" remote volume value, so the UI reflects the actual
+            // volume.
             if (sc.streamType == AudioService.STREAM_REMOTE_MUSIC) {
                 seekBar.setProgress(getStreamVolume(AudioService.STREAM_REMOTE_MUSIC));
             }

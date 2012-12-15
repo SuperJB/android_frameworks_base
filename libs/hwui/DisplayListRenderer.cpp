@@ -1790,8 +1790,6 @@ status_t DisplayListRenderer::drawText(const char* text, int bytesCount, int cou
     //       its own copy as it does right now.
     // Beware: this needs Glyph encoding (already done on the Paint constructor)
     paint->setAntiAlias(true);
-    if (mSubpixelText)
-        paint->setSubpixelText(true);
     if (length < 0.0f) length = paint->measureText(text, bytesCount);
 
     bool reject = false;

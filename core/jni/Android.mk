@@ -161,7 +161,7 @@ ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
     LOCAL_SRC_FILES += \
 	    com_android_internal_app_ActivityTrigger.cpp
     LOCAL_C_INCLUDES += \
-	    hardware/qcom/display_legacy/libtilerenderer
+	    hardware/qcom/display-legacy/libtilerenderer
 endif
 
 LOCAL_C_INCLUDES += \

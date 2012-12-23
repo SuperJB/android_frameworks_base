@@ -51,7 +51,7 @@ ifeq ($(USE_OPENGL_RENDERER),true)
 
 ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
 	LOCAL_C_INCLUDES += \
-		hardware/qcom/display_legacy/libtilerenderer
+		hardware/qcom/display-legacy/libtilerenderer
 endif
 
 ifeq ($(TARGET_BOARD_PLATFORM),exynos4)

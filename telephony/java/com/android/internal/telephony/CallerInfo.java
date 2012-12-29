@@ -29,7 +29,6 @@ import android.provider.ContactsContract.RawContacts;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
-import android.telephony.Rlog;
 import android.util.Log;
 
 import com.android.i18n.phonenumbers.geocoding.PhoneNumberOfflineGeocoder;
@@ -47,7 +46,7 @@ import java.util.Locale;
  */
 public class CallerInfo {
     private static final String TAG = "CallerInfo";
-    private static final boolean VDBG = Rlog.isLoggable(TAG, Log.VERBOSE);
+    private static final boolean VDBG = Log.isLoggable(TAG, Log.VERBOSE);
 
     public static final String UNKNOWN_NUMBER = "-1";
     public static final String PRIVATE_NUMBER = "-2";
@@ -104,7 +103,6 @@ public class CallerInfo {
     // including the send to voicemail flag and the ringtone
     // uri reference.
     public Uri contactRingtoneUri;
-    public Uri contactVibrationUri;
     public boolean shouldSendToVoicemail;
 
     /**
@@ -166,7 +164,7 @@ public class CallerInfo {
         info.isCachedPhotoCurrent = false;
         info.contactExists = false;
 
-        if (VDBG) Rlog.v(TAG, "getCallerInfo() based on cursor...");
+        if (VDBG) Log.v(TAG, "getCallerInfo() based on cursor...");
 
         if (cursor != null) {
             if (cursor.moveToFirst()) {
@@ -211,10 +209,10 @@ public class CallerInfo {
                 columnIndex = getColumnIndexForPersonId(contactRef, cursor);
                 if (columnIndex != -1) {
                     info.person_id = cursor.getLong(columnIndex);
-                    if (VDBG) Rlog.v(TAG, "==> got info.person_id: " + info.person_id);
+                    if (VDBG) Log.v(TAG, "==> got info.person_id: " + info.person_id);
                 } else {
                     // No valid columnIndex, so we can't look up person_id.
-                    Rlog.w(TAG, "Couldn't find person_id column for " + contactRef);
+                    Log.w(TAG, "Couldn't find person_id column for " + contactRef);
                     // Watch out: this means that anything that depends on
                     // person_id will be broken (like contact photo lookups in
                     // the in-call UI, for example.)
@@ -227,15 +225,6 @@ public class CallerInfo {
                     info.contactRingtoneUri = Uri.parse(cursor.getString(columnIndex));
                 } else {
                     info.contactRingtoneUri = null;
-                }
-
-                // look for the custom vibration, create from the string stored
-                // in the database.
-                columnIndex = cursor.getColumnIndex(PhoneLookup.CUSTOM_VIBRATION);
-                if ((columnIndex != -1) && (cursor.getString(columnIndex) != null)) {
-                    info.contactVibrationUri = Uri.parse(cursor.getString(columnIndex));
-                } else {
-                    info.contactVibrationUri = null;
                 }
 
                 // look for the send to voicemail flag, set it to true only
@@ -280,7 +269,7 @@ public class CallerInfo {
      * with all relevant fields empty or null.
      */
     public static CallerInfo getCallerInfo(Context context, String number) {
-        if (VDBG) Rlog.v(TAG, "getCallerInfo() based on number...");
+        if (VDBG) Log.v(TAG, "getCallerInfo() based on number...");
 
         if (TextUtils.isEmpty(number)) {
             return null;
@@ -425,7 +414,7 @@ public class CallerInfo {
             // permission to retrieve VM number and would not call
             // this method.
             // Leave phoneNumber untouched.
-            Rlog.e(TAG, "Cannot access VoiceMail.", se);
+            Log.e(TAG, "Cannot access VoiceMail.", se);
         }
         // TODO: There is no voicemail picture?
         // FIXME: FIND ANOTHER ICON
@@ -484,10 +473,10 @@ public class CallerInfo {
         // So instead, figure out the column to use for person_id by just
         // looking at the URI itself.
 
-        if (VDBG) Rlog.v(TAG, "- getColumnIndexForPersonId: contactRef URI = '"
+        if (VDBG) Log.v(TAG, "- getColumnIndexForPersonId: contactRef URI = '"
                         + contactRef + "'...");
         // Warning: Do not enable the following logging (due to ANR risk.)
-        // if (VDBG) Rlog.v(TAG, "- MIME type: "
+        // if (VDBG) Log.v(TAG, "- MIME type: "
         //                 + context.getContentResolver().getType(contactRef));
 
         String url = contactRef.toString();
@@ -495,25 +484,25 @@ public class CallerInfo {
         if (url.startsWith("content://com.android.contacts/data/phones")) {
             // Direct lookup in the Phone table.
             // MIME type: Phone.CONTENT_ITEM_TYPE (= "vnd.android.cursor.item/phone_v2")
-            if (VDBG) Rlog.v(TAG, "'data/phones' URI; using RawContacts.CONTACT_ID");
+            if (VDBG) Log.v(TAG, "'data/phones' URI; using RawContacts.CONTACT_ID");
             columnName = RawContacts.CONTACT_ID;
         } else if (url.startsWith("content://com.android.contacts/data")) {
             // Direct lookup in the Data table.
             // MIME type: Data.CONTENT_TYPE (= "vnd.android.cursor.dir/data")
-            if (VDBG) Rlog.v(TAG, "'data' URI; using Data.CONTACT_ID");
+            if (VDBG) Log.v(TAG, "'data' URI; using Data.CONTACT_ID");
             // (Note Data.CONTACT_ID and RawContacts.CONTACT_ID are equivalent.)
             columnName = Data.CONTACT_ID;
         } else if (url.startsWith("content://com.android.contacts/phone_lookup")) {
             // Lookup in the PhoneLookup table, which provides "fuzzy matching"
             // for phone numbers.
             // MIME type: PhoneLookup.CONTENT_TYPE (= "vnd.android.cursor.dir/phone_lookup")
-            if (VDBG) Rlog.v(TAG, "'phone_lookup' URI; using PhoneLookup._ID");
+            if (VDBG) Log.v(TAG, "'phone_lookup' URI; using PhoneLookup._ID");
             columnName = PhoneLookup._ID;
         } else {
-            Rlog.w(TAG, "Unexpected prefix for contactRef '" + url + "'");
+            Log.w(TAG, "Unexpected prefix for contactRef '" + url + "'");
         }
         int columnIndex = (columnName != null) ? cursor.getColumnIndex(columnName) : -1;
-        if (VDBG) Rlog.v(TAG, "==> Using column '" + columnName
+        if (VDBG) Log.v(TAG, "==> Using column '" + columnName
                         + "' (columnIndex = " + columnIndex + ") for person_id lookup...");
         return columnIndex;
     }
@@ -540,7 +529,7 @@ public class CallerInfo {
      * @see com.android.i18n.phonenumbers.PhoneNumberOfflineGeocoder
      */
     private static String getGeoDescription(Context context, String number) {
-        if (VDBG) Rlog.v(TAG, "getGeoDescription('" + number + "')...");
+        if (VDBG) Log.v(TAG, "getGeoDescription('" + number + "')...");
 
         if (TextUtils.isEmpty(number)) {
             return null;
@@ -553,17 +542,17 @@ public class CallerInfo {
         String countryIso = getCurrentCountryIso(context, locale);
         PhoneNumber pn = null;
         try {
-            if (VDBG) Rlog.v(TAG, "parsing '" + number
+            if (VDBG) Log.v(TAG, "parsing '" + number
                             + "' for countryIso '" + countryIso + "'...");
             pn = util.parse(number, countryIso);
-            if (VDBG) Rlog.v(TAG, "- parsed number: " + pn);
+            if (VDBG) Log.v(TAG, "- parsed number: " + pn);
         } catch (NumberParseException e) {
-            Rlog.w(TAG, "getGeoDescription: NumberParseException for incoming number '" + number + "'");
+            Log.w(TAG, "getGeoDescription: NumberParseException for incoming number '" + number + "'");
         }
 
         if (pn != null) {
             String description = geocoder.getDescriptionForNumber(pn, locale);
-            if (VDBG) Rlog.v(TAG, "- got description: '" + description + "'");
+            if (VDBG) Log.v(TAG, "- got description: '" + description + "'");
             return description;
         } else {
             return null;
@@ -582,7 +571,7 @@ public class CallerInfo {
         countryIso = detector.detectCountry().getCountryIso();
       } else {
         countryIso = locale.getCountry();
-        Rlog.w(TAG, "No CountryDetector; falling back to countryIso based on locale: "
+        Log.w(TAG, "No CountryDetector; falling back to countryIso based on locale: "
               + countryIso);
       }
       return countryIso;
@@ -614,8 +603,7 @@ public class CallerInfo {
                     .append("\nperson_id: " + person_id)
                     .append("\nneedUpdate: " + needUpdate)
                     .append("\ncontactRefUri: " + contactRefUri)
-                    .append("\ncontactRingtoneUri: " + contactRingtoneUri)
-                    .append("\ncontactVibrationUri: " + contactVibrationUri)
+                    .append("\ncontactRingtoneUri: " + contactRefUri)
                     .append("\nshouldSendToVoicemail: " + shouldSendToVoicemail)
                     .append("\ncachedPhoto: " + cachedPhoto)
                     .append("\nisCachedPhotoCurrent: " + isCachedPhotoCurrent)

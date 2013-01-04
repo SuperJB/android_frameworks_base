@@ -16,44 +16,24 @@
 
 package com.android.systemui;
 
-import android.animation.AnimatorSet;
-import android.animation.PropertyValuesHolder;
-import android.animation.ObjectAnimator;
 import android.animation.TimeAnimator;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.drawable.AnimationDrawable;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
-import android.graphics.Matrix;
 import android.graphics.Paint;
-import android.graphics.Point;
-import android.graphics.PorterDuffColorFilter;
-import android.graphics.PorterDuffXfermode;
-import android.graphics.Rect;
-import android.graphics.RectF;
-import android.os.Handler;
-import android.os.SystemClock;
-import android.provider.Settings;
 import android.util.AttributeSet;
-import android.util.DisplayMetrics;
-import android.util.Pair;
-import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
-import android.view.animation.AnimationUtils;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import java.util.HashMap;
 import java.util.Random;
 
 public class BeanBag extends Activity {
@@ -276,7 +256,6 @@ public class BeanBag extends Activity {
         }
 
         private void reset() {
-//            android.util.Log.d("Nyandroid", "board reset");
             removeAllViews();
 
             final ViewGroup.LayoutParams wrap = new ViewGroup.LayoutParams(
@@ -298,15 +277,7 @@ public class BeanBag extends Activity {
             }
             mAnim = new TimeAnimator();
             mAnim.setTimeListener(new TimeAnimator.TimeListener() {
-                private long lastPrint = 0;
                 public void onTimeUpdate(TimeAnimator animation, long totalTime, long deltaTime) {
-                    if (DEBUG && totalTime - lastPrint > 5000) {
-                        lastPrint = totalTime;
-                        for (int i=0; i<getChildCount(); i++) {
-                            android.util.Log.d("BeanBag", "bean " + i + ": " + getChildAt(i));
-                        }
-                    }
-
                     for (int i=0; i<getChildCount(); i++) {
                         View v = getChildAt(i);
                         if (!(v instanceof Bean)) continue;
@@ -316,8 +287,6 @@ public class BeanBag extends Activity {
                         for (int j=i+1; j<getChildCount(); j++) {
                             View v2 = getChildAt(j);
                             if (!(v2 instanceof Bean)) continue;
-                            Bean nv2 = (Bean) v2;
-                            final float overlap = nv.overlap(nv2);
                         }
 
                         nv.setRotation(nv.a);

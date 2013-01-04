@@ -56,6 +56,11 @@ import java.util.List;
 public class MockPackageManager extends PackageManager {
 
     @Override
+    public List<PackageInfo> getInstalledThemePackages(){
+        return null;
+    }
+
+    @Override
     public PackageInfo getPackageInfo(String packageName, int flags)
     throws NameNotFoundException {
         throw new UnsupportedOperationException();
@@ -577,20 +582,6 @@ public class MockPackageManager extends PackageManager {
         throw new UnsupportedOperationException();
     }
 
-<<<<<<< HEAD
-    /**
-     * @hide - to match hiding in superclass
-     */
-    @Override
-    public List<PackageInfo> getInstalledThemePackages() {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @hide
-     */
-=======
->>>>>>> aosp/master
     @Override
     public void verifyPendingInstall(int id, int verificationCode) {
         throw new UnsupportedOperationException();

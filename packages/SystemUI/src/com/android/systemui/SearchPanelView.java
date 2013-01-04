@@ -18,90 +18,48 @@ package com.android.systemui;
 
 import android.animation.LayoutTransition;
 import android.app.ActivityOptions;
-import android.app.AlertDialog;
-import android.app.Dialog;
 import android.app.SearchManager;
-import android.app.ActivityManager;
-import android.app.ActivityManager.RunningAppProcessInfo;
-import android.app.ActivityManagerNative;
-import android.app.IActivityManager;
-import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
-import android.content.res.Configuration;
-import android.content.Context;
 import android.content.ContentResolver;
-import android.content.DialogInterface;
-import android.content.DialogInterface.OnClickListener;
+import android.content.Context;
 import android.content.Intent;
-import android.content.res.Resources;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
-import android.content.pm.ActivityInfo;
-import android.content.pm.ActivityInfo;
-import android.content.ServiceConnection;
+import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.StateListDrawable;
-import android.media.AudioManager;
-import android.media.ToneGenerator;
-import android.os.Vibrator;
 import android.os.Handler;
-import android.os.IBinder;
-import android.os.SystemClock;
-import android.os.PowerManager;
-import android.os.Process;
-import android.os.ServiceManager;
 import android.os.Message;
-import android.os.Messenger;
-import android.os.RemoteException;
-import android.os.ServiceManager;
 import android.os.UserHandle;
 import android.os.Vibrator;
-import android.os.Handler;
-import android.os.IBinder;
-import android.os.SystemClock;
-import android.os.PowerManager;
-import android.os.Process;
-import android.os.ServiceManager;
-import android.os.Message;
-import android.os.Messenger;
-import android.os.RemoteException;
 import android.provider.Settings;
 import android.util.AttributeSet;
-import android.util.Slog;
 import android.util.Log;
-import android.view.HapticFeedbackConstants;
-import android.view.IWindowManager;
+import android.util.Slog;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.ViewTreeObserver.OnPreDrawListener;
-//import android.view.WindowManagerPolicy.WindowManagerFuncs;
 import android.widget.FrameLayout;
-import android.widget.RelativeLayout;
-import android.widget.Toast;
-
-
 
 import com.android.internal.widget.multiwaveview.GlowPadView;
 import com.android.internal.widget.multiwaveview.GlowPadView.OnTriggerListener;
 import com.android.internal.widget.multiwaveview.TargetDrawable;
-import com.android.systemui.R;
+import com.android.systemui.aokp.AokpTarget;
 import com.android.systemui.recent.StatusBarTouchProxy;
 import com.android.systemui.statusbar.BaseStatusBar;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.phone.PhoneStatusBar;
 import com.android.systemui.statusbar.tablet.StatusBarPanel;
 import com.android.systemui.statusbar.tablet.TabletStatusBar;
-import com.android.systemui.aokp.AokpTarget;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.net.URISyntaxException;
+//import android.view.WindowManagerPolicy.WindowManagerFuncs;
 
 public class SearchPanelView extends FrameLayout implements
         StatusBarPanel, ActivityOptions.OnAnimationStartedListener {
@@ -119,14 +77,11 @@ public class SearchPanelView extends FrameLayout implements
     private boolean mShowing;
     private View mSearchTargetsContainer;
     private GlowPadView mGlowPadView;
-    private IWindowManager mWm;
 
     private AokpTarget mAokpTarget;
 
     private PackageManager mPackageManager;
     private Resources mResources;
-    private TargetObserver mTargetObserver;
-    private ContentResolver mContentResolver;
     private String[] targetActivities = new String[5];
     private String[] longActivities = new String[5];
     private int startPosOffset;
@@ -143,27 +98,6 @@ public class SearchPanelView extends FrameLayout implements
     ArrayList<String> longList = new ArrayList<String>();
     String mEmpty = "**assist**";
 
-    private PackageManager mPackageManager;
-    private Resources mResources;
-    private TargetObserver mTargetObserver;
-    private ContentResolver mContentResolver;
-    private List<String> targetActivities;
-    private List<String> longActivities;
-    private int startPosOffset;
-
-    private int mNavRingAmount;
-    private boolean mTabletui;
-    private boolean mLefty;
-    private boolean mLongPress;
-    private boolean mSearchPanelLock;
-    private int mTarget;
-
-    //need to make an intent list and an intent counter
-    String[] intent;
-    ArrayList<String> intentList = new ArrayList<String>();
-    ArrayList<String> longList = new ArrayList<String>();
-    String mEmpty = "assist";
-
     public SearchPanelView(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
     }
@@ -171,11 +105,9 @@ public class SearchPanelView extends FrameLayout implements
     public SearchPanelView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
         mContext = context;
-        mWm = IWindowManager.Stub.asInterface(ServiceManager.getService("window"));
         mPackageManager = mContext.getPackageManager();
         mResources = mContext.getResources();
 
-        mContentResolver = mContext.getContentResolver();
 
         mAokpTarget = new AokpTarget(context);
 
@@ -239,7 +171,7 @@ public class SearchPanelView extends FrameLayout implements
         }
 
         public void onTrigger(View v, final int target) {
-            final int resId = mGlowPadView.getResourceIdForTarget(target);
+            mGlowPadView.getResourceIdForTarget(target);
             mTarget = target;
             if (!mLongPress) {
                mAokpTarget.launchAction(intentList.get(target));
@@ -449,7 +381,7 @@ public class SearchPanelView extends FrameLayout implements
                 Settings.System.HAPTIC_FEEDBACK_ENABLED, 1, UserHandle.USER_CURRENT) != 0) {
             Resources res = context.getResources();
             Vibrator vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
-            vibrator.vibrate(mResources.getInteger(R.integer.config_search_panel_view_vibration_duration));
+            vibrator.vibrate(res.getInteger(R.integer.config_search_panel_view_vibration_duration));
         }
     }
 
@@ -616,248 +548,4 @@ public class SearchPanelView extends FrameLayout implements
         mNavRingAmount = Settings.System.getInt(mContext.getContentResolver(),
                          Settings.System.SYSTEMUI_NAVRING_AMOUNT, 1);
     }
-
-    private void screenOff() {
-        PowerManager pm = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
-        pm.goToSleep(SystemClock.uptimeMillis() + 1);
-    }
-
-    private void killProcess() {
-        try {
-            final Intent intent = new Intent(Intent.ACTION_MAIN);
-            String defaultHomePackage = "com.android.launcher";
-            intent.addCategory(Intent.CATEGORY_HOME);
-            final ResolveInfo res = mContext.getPackageManager().resolveActivity(intent, 0);
-            if (res.activityInfo != null && !res.activityInfo.packageName.equals("android")) {
-                defaultHomePackage = res.activityInfo.packageName;
-            }
-            boolean targetKilled = false;
-            IActivityManager am = ActivityManagerNative.getDefault();
-            List<RunningAppProcessInfo> apps = am.getRunningAppProcesses();
-            for (RunningAppProcessInfo appInfo : apps) {
-                int uid = appInfo.uid;
-                // Make sure it's a foreground user application (not system,
-                // root, phone, etc.)
-                if (uid >= Process.FIRST_APPLICATION_UID && uid <= Process.LAST_APPLICATION_UID
-                        && appInfo.importance == RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
-                    if (appInfo.pkgList != null && (appInfo.pkgList.length > 0)) {
-                        for (String pkg : appInfo.pkgList) {
-                            if (!pkg.equals("com.android.systemui") && !pkg.equals(defaultHomePackage)) {
-                                am.forceStopPackage(pkg);
-                                targetKilled = true;
-                                break;
-                            }
-                        }
-                    } else {
-                        Process.killProcess(appInfo.pid);
-                        targetKilled = true;
-                    }
-                }
-                if (targetKilled) {
-                    Toast.makeText(mContext, R.string.app_killed_message, Toast.LENGTH_SHORT).show();
-                    break;
-                }
-            }
-        } catch (RemoteException remoteException) {
-            // Do nothing; just let it go.
-        }
-    }
-
-    /**
-     * functions needed for taking screenhots. This leverages the built in ICS
-     * screenshot functionality
-     */
-    final Object mScreenshotLock = new Object();
-    ServiceConnection mScreenshotConnection = null;
-
-    final Runnable mScreenshotTimeout = new Runnable() {
-        @Override
-        public void run() {
-            synchronized (mScreenshotLock) {
-                if (mScreenshotConnection != null) {
-                    mContext.unbindService(mScreenshotConnection);
-                    mScreenshotConnection = null;
-                }
-            }
-        }
-    };
-
-    private void takeScreenshot() {
-        synchronized (mScreenshotLock) {
-            if (mScreenshotConnection != null) {
-                return;
-            }
-            ComponentName cn = new ComponentName("com.android.systemui",
-                    "com.android.systemui.screenshot.TakeScreenshotService");
-            Intent intent = new Intent();
-            intent.setComponent(cn);
-            ServiceConnection conn = new ServiceConnection() {
-                @Override
-                public void onServiceConnected(ComponentName name, IBinder service) {
-                    synchronized (mScreenshotLock) {
-                        if (mScreenshotConnection != this) {
-                            return;
-                        }
-                        Messenger messenger = new Messenger(service);
-                        Message msg = Message.obtain(null, 1);
-                        final ServiceConnection myConn = this;
-                        Handler h = new Handler(H.getLooper()) {
-                            @Override
-                            public void handleMessage(Message msg) {
-                                synchronized (mScreenshotLock) {
-                                    if (mScreenshotConnection == myConn) {
-                                        mContext.unbindService(mScreenshotConnection);
-                                        mScreenshotConnection = null;
-                                        H.removeCallbacks(mScreenshotTimeout);
-                                    }
-                                }
-                            }
-                        };
-                        msg.replyTo = new Messenger(h);
-                        msg.arg1 = msg.arg2 = 0;
-
-                        /*
-                         * remove for the time being if (mStatusBar != null &&
-                         * mStatusBar.isVisibleLw()) msg.arg1 = 1; if
-                         * (mNavigationBar != null &&
-                         * mNavigationBar.isVisibleLw()) msg.arg2 = 1;
-                         */
-
-                        /* wait for the dialog box to close */
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException ie) {
-                        }
-
-                        /* take the screenshot */
-                        try {
-                            messenger.send(msg);
-                        } catch (RemoteException e) {
-                        }
-                    }
-                }
-
-                @Override
-                public void onServiceDisconnected(ComponentName name) {
-                }
-            };
-            if (mContext.bindService(intent, conn, Context.BIND_AUTO_CREATE)) {
-                mScreenshotConnection = conn;
-                H.postDelayed(mScreenshotTimeout, 10000);
-            }
-        }
-    }
-
-    private Handler H = new Handler() {
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-
-            }
-        }
-    };
-
-    public int screenLayout() {
-        final int screenSize = Resources.getSystem().getConfiguration().screenLayout &
-                Configuration.SCREENLAYOUT_SIZE_MASK;
-        return screenSize;
-    }
-
-    public boolean isScreenPortrait() {
-        return mResources.getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
-    }
-
-    public class TargetObserver extends ContentObserver {
-        public TargetObserver(Handler handler) {
-            super(handler);
-        }
-
-        @Override
-        public boolean deliverSelfNotifications() {
-            return super.deliverSelfNotifications();
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-            setDrawables();
-        }
-    }
-
-    class SettingsObserver extends ContentObserver {
-        SettingsObserver(Handler handler) {
-            super(handler);
-        }
-
-        void observe() {
-            ContentResolver resolver = mContext.getContentResolver();
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.SYSTEMUI_NAVRING_1), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.SYSTEMUI_NAVRING_2), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.SYSTEMUI_NAVRING_3), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.SYSTEMUI_NAVRING_4), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.SYSTEMUI_NAVRING_5), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.SYSTEMUI_NAVRING_LONG_1), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.SYSTEMUI_NAVRING_LONG_2), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.SYSTEMUI_NAVRING_LONG_3), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.SYSTEMUI_NAVRING_LONG_4), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.SYSTEMUI_NAVRING_LONG_5), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.MODE_TABLET_UI), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.NAVIGATION_BAR_LEFTY_MODE), false, this);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.SYSTEMUI_NAVRING_AMOUNT), false, this);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            updateSettings();
-            setDrawables();
-        }
-    }
-
-    public void updateSettings() {
-
-        targetActivities = Arrays.asList(Settings.System.getString(
-                                                               mContext.getContentResolver(), Settings.System.SYSTEMUI_NAVRING_1),
-                                                      Settings.System.getString(
-                                                               mContext.getContentResolver(), Settings.System.SYSTEMUI_NAVRING_2),
-                                                      Settings.System.getString(
-                                                               mContext.getContentResolver(), Settings.System.SYSTEMUI_NAVRING_3),
-                                                      Settings.System.getString(
-                                                               mContext.getContentResolver(), Settings.System.SYSTEMUI_NAVRING_4),
-                                                      Settings.System.getString(
-                                                               mContext.getContentResolver(), Settings.System.SYSTEMUI_NAVRING_5));
-
-        longActivities = Arrays.asList(Settings.System.getString(
-                                                               mContext.getContentResolver(), Settings.System.SYSTEMUI_NAVRING_LONG_1),
-                                                      Settings.System.getString(
-                                                               mContext.getContentResolver(), Settings.System.SYSTEMUI_NAVRING_LONG_2),
-                                                      Settings.System.getString(
-                                                               mContext.getContentResolver(), Settings.System.SYSTEMUI_NAVRING_LONG_3),
-                                                      Settings.System.getString(
-                                                               mContext.getContentResolver(), Settings.System.SYSTEMUI_NAVRING_LONG_4),
-                                                      Settings.System.getString(
-                                                               mContext.getContentResolver(), Settings.System.SYSTEMUI_NAVRING_LONG_5));
-
-        mTabletui = Settings.System.getBoolean(mContext.getContentResolver(),
-                        Settings.System.MODE_TABLET_UI, false);
-
-        mLefty = (Settings.System.getBoolean(mContext.getContentResolver(),
-                Settings.System.NAVIGATION_BAR_LEFTY_MODE, false));
-
-        mNavRingAmount = Settings.System.getInt(mContext.getContentResolver(),
-                         Settings.System.SYSTEMUI_NAVRING_AMOUNT, 1);
-    }
-
 }
-

@@ -29,7 +29,6 @@ import android.content.IntentFilter;
 import android.content.pm.IPackageManager;
 import android.content.res.Configuration;
 import android.database.ContentObserver;
-import android.database.Cursor;
 import android.media.AudioService;
 import android.net.wifi.p2p.WifiP2pService;
 import android.os.Handler;
@@ -42,6 +41,7 @@ import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.server.search.SearchManagerService;
 import android.service.dreams.DreamService;
 import android.util.DisplayMetrics;
@@ -333,13 +333,6 @@ class ServerThread extends Thread {
             ServiceManager.addService(Context.WINDOW_SERVICE, wm);
             ServiceManager.addService(Context.INPUT_SERVICE, inputManager);
 
-if (SystemProperties.get("ro.allwinner.device").equals("1")) {
-            if(SystemProperties.get("ro.display.switch").equals("1")) {
-                Slog.i(TAG, "Display Manager");
-                DisplayManagerService display = new DisplayManagerService(context,power);
-                ServiceManager.addService(Context.DISPLAY_SERVICE, display);
-            }
-}
             ActivityManagerService.self().setWindowManager(wm);
 
             inputManager.setWindowManagerCallbacks(wm.getInputMonitor());

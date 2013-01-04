@@ -17,9 +17,7 @@
 package com.android.server;
 
 import android.app.StatusBarManager;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.os.Binder;
@@ -374,15 +372,6 @@ public class StatusBarManagerService extends IStatusBarService.Stub
     }
 
     @Override
-    public void toggleNotificationShade() {
-        if (mBar != null) {
-            try {
-                mBar.toggleNotificationShade();
-            } catch (RemoteException ex) {}
-        }
-    }
-
-    @Override
     public void toggleRecentApps() {
         if (mBar != null) {
             try {
@@ -643,26 +632,5 @@ public class StatusBarManagerService extends IStatusBarService.Stub
             }
         }
     }
-
-    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS.equals(action)
-                    || Intent.ACTION_SCREEN_OFF.equals(action)) {
-                collapsePanels();
-            }
-            /*
-            else if (Telephony.Intents.SPN_STRINGS_UPDATED_ACTION.equals(action)) {
-                updateNetworkName(intent.getBooleanExtra(Telephony.Intents.EXTRA_SHOW_SPN, false),
-                        intent.getStringExtra(Telephony.Intents.EXTRA_SPN),
-                        intent.getBooleanExtra(Telephony.Intents.EXTRA_SHOW_PLMN, false),
-                        intent.getStringExtra(Telephony.Intents.EXTRA_PLMN));
-            }
-            else if (Intent.ACTION_CONFIGURATION_CHANGED.equals(action)) {
-                updateResources();
-            }
-            */
-        }
-    };
 
 }

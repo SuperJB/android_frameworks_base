@@ -42,6 +42,8 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.RemoteException;
+import android.os.storage.StorageManager;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Pair;
 import android.util.Slog;
@@ -69,6 +71,7 @@ import com.android.systemui.R;
 import com.android.systemui.statusbar.BaseStatusBar;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.DoNotDisturb;
+import com.android.systemui.statusbar.NavigationBarView;
 import com.android.systemui.statusbar.NotificationData;
 import com.android.systemui.statusbar.NotificationData.Entry;
 import com.android.systemui.statusbar.SignalClusterView;
@@ -149,8 +152,6 @@ public class TabletStatusBar extends BaseStatusBar implements
     boolean mNotificationDNDMode;
     NotificationData.Entry mNotificationDNDDummyEntry;
 
-    private boolean mAltBackButtonEnabledForIme;
-
     NavigationBarView mNavBarView;
 
     // Will determine if NavBar goes to the left side in Landscape Mode
@@ -172,12 +173,8 @@ public class TabletStatusBar extends BaseStatusBar implements
     int mNotificationFlingVelocity;
 
     BluetoothController mBluetoothController;
-    LocationController mLocationController;
     NetworkController mNetworkController;
     DoNotDisturb mDoNotDisturb;
-    DisplayController mDisplayController;
-
-    private boolean mHasDockBattery;
 
     ViewGroup mBarContents;
 
@@ -360,8 +357,6 @@ public class TabletStatusBar extends BaseStatusBar implements
 
         mWindowManager.addView(mCompatModePanel, lp);
 
-        mRecentButton.setOnTouchListener(mRecentsPreloadOnTouchListener);
-
         mPile = (NotificationRowLayout)mNotificationPanel.findViewById(R.id.content);
         mPile.removeAllViews();
         mPile.setLongPressListener(getNotificationLongClicker());
@@ -435,8 +430,6 @@ public class TabletStatusBar extends BaseStatusBar implements
         loadDimens();
         mNotificationPanelParams.height = getNotificationPanelHeight();
         mWindowManager.updateViewLayout(mNotificationPanel, mNotificationPanelParams);
-        mShowSearchHoldoff = mContext.getResources().getInteger(
-                R.integer.config_show_search_delay);
         updateSearchPanel();
     }
 
@@ -478,11 +471,6 @@ public class TabletStatusBar extends BaseStatusBar implements
             mCurrentTheme = (CustomTheme)currentTheme.clone();
         }
 
-        CustomTheme currentTheme = mContext.getResources().getConfiguration().customTheme;
-        if (currentTheme != null) {
-            mCurrentTheme = (CustomTheme)currentTheme.clone();
-        }
-        
         loadDimens();
 
         // updateSettings() isn't run until after the view is inflated.  Need to
@@ -528,9 +516,6 @@ public class TabletStatusBar extends BaseStatusBar implements
         mNotificationFlingVelocity = 300; // px/s
 
         mTicker = new TabletTicker(this);
-
-        // The icons
-        mLocationController = new LocationController(mContext); // will post a notification
 
         // watch the PREF_DO_NOT_DISTURB and convert to appropriate disable() calls
         mDoNotDisturb = new DoNotDisturb(mContext);
@@ -701,14 +686,6 @@ public class TabletStatusBar extends BaseStatusBar implements
         lp.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
                 | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING;
         return lp;
-    }
-
-    @Override
-    public void toggleNotificationShade() {
-        int msg = (mNotificationPanel.isShowing())
-                ? MSG_CLOSE_NOTIFICATION_PANEL : MSG_OPEN_NOTIFICATION_PANEL;
-        mHandler.removeMessages(msg);
-        mHandler.sendEmptyMessage(msg);
     }
 
     @Override
@@ -1210,7 +1187,6 @@ public class TabletStatusBar extends BaseStatusBar implements
 
         boolean altBack = (backDisposition == InputMethodService.BACK_DISPOSITION_WILL_DISMISS)
             || ((vis & InputMethodService.IME_VISIBLE) != 0);
-        mAltBackButtonEnabledForIme = altBack; 
 
         mCommandQueue.setNavigationIconHints(
                 altBack ? (mNavigationIconHints | StatusBarManager.NAVIGATION_HINT_BACK_ALT)
@@ -1426,10 +1402,6 @@ public class TabletStatusBar extends BaseStatusBar implements
         }
 
         int N = mNotificationData.size();
-
-        if (DEBUG) {
-            Slog.d(TAG, "refreshing icons: " + N + " notifications, mIconLayout=" + mIconLayout);
-        }
 
         ArrayList<View> toShow = new ArrayList<View>();
 

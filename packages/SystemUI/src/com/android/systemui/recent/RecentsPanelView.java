@@ -81,12 +81,8 @@ public class RecentsPanelView extends FrameLayout implements OnItemClickListener
 
     private boolean mShowing;
     private boolean mWaitingToShow;
-    private int mNumItemsWaitingForThumbnailsAndIcons;
     private ViewHolder mItemToAnimateInWhenWindowAnimationIsFinished;
     private boolean mWaitingForWindowAnimation;
-
-    private Button mRecentsKillAllButton;
-    private LinearColorBar mRamUsageBar;
 
     private Button mRecentsKillAllButton;
     private LinearColorBar mRamUsageBar;
@@ -206,7 +202,6 @@ public class RecentsPanelView extends FrameLayout implements OnItemClickListener
             if (td.isLoaded()) {
                 updateThumbnail(holder, td.getThumbnail(), true, false);
                 updateIcon(holder, td.getIcon(), true, false);
-                mNumItemsWaitingForThumbnailsAndIcons--;
             }
             if (index == 0) {
                 if (mWaitingForWindowAnimation) {
@@ -573,7 +568,6 @@ public class RecentsPanelView extends FrameLayout implements OnItemClickListener
                             updateIcon(h, td.getIcon(), true, animateShow);
                             updateThumbnail(h, td.getThumbnail(), true, animateShow);
                             h.loadedThumbnailAndIcon = true;
-                            mNumItemsWaitingForThumbnailsAndIcons--;
                         }
                     }
                 }
@@ -636,9 +630,6 @@ public class RecentsPanelView extends FrameLayout implements OnItemClickListener
     }
 
     public void onTasksLoaded(ArrayList<TaskDescription> tasks, boolean firstScreenful) {
-        mNumItemsWaitingForThumbnailsAndIcons = firstScreenful
-                ? tasks.size() : mRecentTaskDescriptions == null
-                        ? 0 : mRecentTaskDescriptions.size();
         if (mRecentTaskDescriptions == null) {
             mRecentTaskDescriptions = new ArrayList<TaskDescription>(tasks);
         } else {

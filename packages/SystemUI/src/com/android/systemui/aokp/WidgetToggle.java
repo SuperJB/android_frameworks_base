@@ -1,7 +1,5 @@
 /*
- * Copyright 2011 Colin McDonough
- *
- * Modified for AOKP by Mike Wilson - Zaphod-Beeblebrox
+ * Copyright 2011 AOKP by Mike Wilson - Zaphod-Beeblebrox
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,25 +14,35 @@
  * limitations under the License.
  */
 
-package com.android.systemui;
+package com.android.systemui.aokp;
+
+import com.android.systemui.statusbar.WidgetView;
 
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 
 /*
- * Torch is an LED flashlight.
+ * Toggle the NavBar
  */
-public class GoToHomescreen extends Activity {
 
-    /** Called when the activity is first created. */
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        Intent startMain = new Intent(Intent.ACTION_MAIN);
-        startMain.addCategory(Intent.CATEGORY_HOME);
-        startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(startMain);
-        finish();
-    }
+public class WidgetToggle extends Activity  {
+  public WidgetToggle() {
+    super();
+  }
+
+  /** Called when the activity is first created. */
+  @Override
+  public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+  }
+
+  @Override
+  public void onResume() {
+    super.onResume();
+    Intent toggleWidgets = new Intent(
+            WidgetView.WidgetReceiver.ACTION_TOGGLE_WIDGETS);
+    sendBroadcast(toggleWidgets);
+    this.finish();
+  }
 }

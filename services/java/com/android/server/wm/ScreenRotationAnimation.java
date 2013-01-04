@@ -196,9 +196,8 @@ class ScreenRotationAnimation {
         mDisplay = display;
         mExitAnimId = exitAnim;
         mEnterAnimId = enterAnim;
-
-        // Screenshot does NOT include rotation!
-        if (originalRotation == Surface.ROTATION_90
+        if (mSnapshotRotation == Surface.ROTATION_0 || mSnapshotRotation == Surface.ROTATION_180) {
+            if (originalRotation == Surface.ROTATION_90
                 || originalRotation == Surface.ROTATION_270) {
                 mWidth = originalHeight;
                 mHeight = originalWidth;

@@ -1,4 +1,4 @@
- 	/*
+/*
  * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -53,15 +53,14 @@ import com.android.internal.R;
  * minutes.
  */
 public class Clock extends TextView {
-	protected boolean mAttached;
-	protected Calendar mCalendar;
-	protected String mClockFormatString;
-	protected SimpleDateFormat mClockFormat;
+    private boolean mAttached;
+    private Calendar mCalendar;
+    private String mClockFormatString;
+    private SimpleDateFormat mClockFormat;
 
-    public static final int AM_PM_STYLE_NORMAL  = 0;
-    public static final int AM_PM_STYLE_SMALL   = 1;
-    public static final int AM_PM_STYLE_GONE    = 2;
-    public static final int PROTEKK_O_CLOCK     = 3;
+    private static final int AM_PM_STYLE_NORMAL  = 0;
+    private static final int AM_PM_STYLE_SMALL   = 1;
+    private static final int AM_PM_STYLE_GONE    = 2;
 
     protected int mAmPmStyle = AM_PM_STYLE_GONE;
 
@@ -97,10 +96,6 @@ public class Clock extends TextView {
 
         if (!mAttached) {
             mAttached = true;
-            //This should give me the default color for the textview before any ROMControl coloring
-            // has been applied.  This is important, as we want to preserve theme colors if the user
-            // hasn't specified a color
-            mClockColor = getTextColors().getDefaultColor();
             IntentFilter filter = new IntentFilter();
 
             filter.addAction(Intent.ACTION_TIME_TICK);
@@ -148,15 +143,9 @@ public class Clock extends TextView {
 
     final void updateClock() {
         mCalendar.setTimeInMillis(System.currentTimeMillis());
-        
-        if (mAmPmStyle == PROTEKK_O_CLOCK) {
-        	setText("99:99");
-        } else {	
-            setText(getSmallTime());
-        }
-        
+        setText(getSmallTime());
     }
-    
+
     private final CharSequence getSmallTime() {
         Context context = getContext();
         boolean b24 = DateFormat.is24HourFormat(context);
@@ -223,48 +212,11 @@ public class Clock extends TextView {
                                           Spannable.SPAN_EXCLUSIVE_INCLUSIVE);
                     }
                 }
-        	}  
+            }
         }
         return formatted;
     }
 
-    /**
-     * pull the int given by DAY_OF_WEEK into a day string
-     */
-    private String whatDay(int today) {
-    	String todayIs = null;
-    	switch (today) {
-    	case 1:
-			todayIs = getResources().getString(R.string.day_of_week_medium_sunday);
-			break;
-		case 2:
-			todayIs = getResources().getString(R.string.day_of_week_medium_monday);
-			break;
-		case 3:
-			todayIs = getResources().getString(R.string.day_of_week_medium_tuesday);
-			break;
-		case 4:
-			todayIs = getResources().getString(R.string.day_of_week_medium_wednesday);
-			break;
-		case 5:
-			todayIs = getResources().getString(R.string.day_of_week_medium_thursday);
-			break;
-		case 6:
-			todayIs = getResources().getString(R.string.day_of_week_medium_friday);
-			break;
-		case 7:
-			todayIs = getResources().getString(R.string.day_of_week_medium_saturday);
-			break;
-    	}
-    		
-        return todayIs.toUpperCase() + " ";
-    }
-    
-=======
-        return formatted;
-    }
-
->>>>>>> aokp/jb-mr1
     protected class SettingsObserver extends ContentObserver {
         SettingsObserver(Handler handler) {
             super(handler);

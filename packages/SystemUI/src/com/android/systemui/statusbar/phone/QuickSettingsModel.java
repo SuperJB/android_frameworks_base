@@ -16,7 +16,6 @@
 
 package com.android.systemui.statusbar.phone;
 
-import android.app.ActivityManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothAdapter.BluetoothStateChangeCallback;
 import android.content.BroadcastReceiver;
@@ -34,18 +33,16 @@ import android.net.ConnectivityManager;
 import android.net.wifi.WifiManager;
 import android.nfc.NfcAdapter;
 import android.os.Handler;
-import android.os.UserHandle;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.View;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.view.inputmethod.InputMethodSubtype;
 
+import com.android.internal.telephony.Phone;
 import com.android.internal.view.RotationPolicy;
-import com.android.internal.telephony.PhoneConstants;
 import com.android.systemui.R;
 import com.android.systemui.statusbar.policy.BatteryController.BatteryStateChangeCallback;
 import com.android.systemui.statusbar.policy.BrightnessController.BrightnessStateChangeCallback;
@@ -53,12 +50,6 @@ import com.android.systemui.statusbar.policy.CurrentUserTracker;
 import com.android.systemui.statusbar.policy.LocationController.LocationGpsStateChangeCallback;
 import com.android.systemui.statusbar.policy.NetworkController.NetworkSignalChangedCallback;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -71,9 +62,6 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
     // Sett InputMethoManagerService
     private static final String TAG_TRY_SUPPRESSING_IME_SWITCHER = "TrySuppressingImeSwitcher";
 
-    public static final String FAST_CHARGE_DIR = "/sys/kernel/fast_charge";
-    public static final String FAST_CHARGE_FILE = "force_fast_charge";
-    
     private int dataState = -1;
 
     private WifiManager wifiManager;
@@ -203,7 +191,10 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
     private RefreshCallback mUserCallback;
     private UserState mUserState = new UserState();
 
-    private QuickSettingsTileView mTimeTile;
+    private QuickSettingsTileView mFavContactTile;
+    private RefreshCallback mFavContactCallback;
+    private UserState mFavContactState = new UserState();
+
     private RefreshCallback mTimeCallback;
     private State mTimeState = new State();
 
@@ -254,10 +245,6 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
     private QuickSettingsTileView mSilentTile;
     private RefreshCallback mSilentCallback;
     private State mSilentState = new State();
-
-    private QuickSettingsTileView mFChargeTile;
-    private RefreshCallback mFChargeCallback;
-    private State mFChargeState = new State();
 
     private QuickSettingsTileView mNFCTile;
     private RefreshCallback mNFCCallback;
@@ -369,8 +356,6 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
                 refreshUSBTetherTile();
            /* if (toggle.equals(QuickSettings.BT_TETHER_TOGGLE))
                 refreshBTTetherTile();  */
-            if (toggle.equals(QuickSettings.FCHARGE_TOGGLE))
-                refreshFChargeTile();
             if (toggle.equals(QuickSettings.TWOG_TOGGLE))
                 refresh2gTile();
             if (toggle.equals(QuickSettings.LTE_TOGGLE))
@@ -414,9 +399,23 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
         }
     }
 
+    // Favorite Contact
+    void addFavContactTile(QuickSettingsTileView view, RefreshCallback cb) {
+        mFavContactTile = view;
+        mFavContactCallback = cb;
+        mFavContactCallback.refreshView(mFavContactTile, mFavContactState);
+    }
+
+    void setFavContactTileInfo(String name, Drawable avatar) {
+        if (mFavContactCallback != null) {
+            mFavContactState.label = name;
+            mFavContactState.avatar = avatar;
+            mFavContactCallback.refreshView(mFavContactTile, mFavContactState);
+        }
+    }
+
     // Time
     void addTimeTile(QuickSettingsTileView view, RefreshCallback cb) {
-        mTimeTile = view;
         mTimeCallback = cb;
         mTimeCallback.refreshView(view, mTimeState);
     }
@@ -624,7 +623,9 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
             mBluetoothState.label = r.getString(R.string.quick_settings_bluetooth_off_label);
             mBluetoothState.stateContentDescription = r.getString(R.string.accessibility_desc_off);
         }
-        mBluetoothCallback.refreshView(mBluetoothTile, mBluetoothState);
+        if(mBluetoothTile != null) {
+            mBluetoothCallback.refreshView(mBluetoothTile, mBluetoothState);
+        }
     }
 
     void refreshBluetoothTile() {
@@ -896,46 +897,6 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
         }
     }
 
-    // Fcharge
-    void addFChargeTile(QuickSettingsTileView view, RefreshCallback cb) {
-        mFChargeTile = view;
-        mFChargeCallback = cb;
-        onFChargeChanged();
-    }
-
-    void onFChargeChanged() {
-        boolean enabled = isFastChargeOn();
-        mFChargeState.enabled = enabled;
-        mFChargeState.iconId = enabled
-                ? R.drawable.ic_qs_fcharge_on
-                : R.drawable.ic_qs_fcharge_off;
-        mFChargeState.label = enabled
-                ? mContext.getString(R.string.quick_settings_fcharge_on_label)
-                : mContext.getString(R.string.quick_settings_fcharge_off_label);
-
-        if (mFChargeTile != null && mFChargeCallback != null) {
-            mFChargeCallback.refreshView(mFChargeTile, mFChargeState);
-        }
-    }
-
-    void refreshFChargeTile() {
-        if (mFChargeTile != null) {
-            onFChargeChanged();
-        }
-    }
-
-    public boolean isFastChargeOn() {
-        try {
-            File fastcharge = new File(FAST_CHARGE_DIR, FAST_CHARGE_FILE);
-            FileReader reader = new FileReader(fastcharge);
-            BufferedReader breader = new BufferedReader(reader);
-            return (breader.readLine().equals("1"));
-        } catch (IOException e) {
-            Log.e("FChargeToggle", "Couldn't read fast_charge file");
-            return false;
-        }
-    }
-
     // Sync
     void addSyncTile(QuickSettingsTileView view, RefreshCallback cb) {
         mSyncTile = view;
@@ -977,7 +938,7 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
         } catch (SettingNotFoundException e) {
             e.printStackTrace();
         }
-        boolean enabled = (dataState == PhoneConstants.NT_MODE_LTE_CDMA_EVDO) || (dataState == PhoneConstants.NT_MODE_GLOBAL);
+        boolean enabled = (dataState == Phone.NT_MODE_LTE_CDMA_EVDO) || (dataState == Phone.NT_MODE_GLOBAL);
         mLTEState.enabled = enabled;
         mLTEState.iconId = enabled
                 ? R.drawable.ic_qs_lte_on
@@ -1010,7 +971,7 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
         } catch (SettingNotFoundException e) {
             e.printStackTrace();
         }
-        boolean enabled = dataState == PhoneConstants.NT_MODE_GSM_ONLY;
+        boolean enabled = dataState == Phone.NT_MODE_GSM_ONLY;
         m2gState.enabled = enabled;
         m2gState.iconId = enabled
                 ? R.drawable.ic_qs_2g_on
@@ -1123,7 +1084,6 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
         ConnectivityManager connManager = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
         String[] mUsbRegexs = connManager.getTetherableUsbRegexs();
         String[] tethered = connManager.getTetheredIfaces();
-        boolean usbTethered = false;
         for (String s : tethered) {
             for (String regex : mUsbRegexs) {
                 if (s.matches(regex)) {
@@ -1247,4 +1207,5 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
     public void setNfcAdapter(NfcAdapter adapter) {
         mNfcAdapter = adapter;
     }
+
 }

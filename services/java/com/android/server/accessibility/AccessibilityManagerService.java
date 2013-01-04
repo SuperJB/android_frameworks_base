@@ -1123,7 +1123,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub {
                 return;
             }
             mEnableTouchExplorationDialog = new AlertDialog.Builder(mContext)
-                .setIconAttribute(android.R.attr.alertDialogIcon)
+                .setIcon(android.R.drawable.ic_dialog_alert)
                 .setPositiveButton(android.R.string.ok, new OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -1309,40 +1309,6 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub {
                         if (mHasInputFilter && mInputFilter != null) {
                             mInputFilter.notifyAccessibilityEvent(event);
                         }
-                        if (mEnableTouchExplorationDialog != null
-                                && mEnableTouchExplorationDialog.isShowing()) {
-                            return;
-                        }
-                        mEnableTouchExplorationDialog = new AlertDialog.Builder(mContext)
-                            .setIconAttribute(android.R.attr.alertDialogIcon)
-                            .setPositiveButton(android.R.string.ok, new OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    // The user allowed the service to toggle touch exploration.
-                                    mTouchExplorationGrantedServices.add(service.mComponentName);
-                                    persistComponentNamesToSettingLocked(
-                                            Settings.Secure.
-                                                   TOUCH_EXPLORATION_GRANTED_ACCESSIBILITY_SERVICES,
-                                            mTouchExplorationGrantedServices);
-                                    // Enable touch exploration.
-                                    Settings.Secure.putInt(mContext.getContentResolver(),
-                                            Settings.Secure.TOUCH_EXPLORATION_ENABLED, 1);
-                                }
-                            })
-                            .setNegativeButton(android.R.string.cancel, new OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    dialog.dismiss();
-                                }
-                            })
-                            .setTitle(R.string.enable_explore_by_touch_warning_title)
-                            .setMessage(mContext.getString(
-                                R.string.enable_explore_by_touch_warning_message, label))
-                            .create();
-                        mEnableTouchExplorationDialog.getWindow().setType(
-                                WindowManager.LayoutParams.TYPE_INPUT_METHOD_DIALOG);
-                        mEnableTouchExplorationDialog.setCanceledOnTouchOutside(true);
-                        mEnableTouchExplorationDialog.show();
                     }
                     event.recycle();
                 } break;

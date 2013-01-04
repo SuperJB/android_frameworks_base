@@ -213,13 +213,6 @@ public class CommandQueue extends IStatusBar.Stub {
         }
     }
 
-    public void toggleNotificationShade() {
-        synchronized (mList) {
-            mHandler.removeMessages(MSG_TOGGLE_NOTIFICATION_SHADE);
-            mHandler.obtainMessage(MSG_TOGGLE_NOTIFICATION_SHADE, 0, 0, null).sendToTarget();
-        }
-    }
-
     public void toggleRecentApps() {
         synchronized (mList) {
             mHandler.removeMessages(MSG_TOGGLE_RECENT_APPS);

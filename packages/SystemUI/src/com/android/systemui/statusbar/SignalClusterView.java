@@ -41,8 +41,6 @@ public class SignalClusterView
     static final boolean DEBUG = false;
     static final String TAG = "SignalClusterView";
 
-    private static final int EVENT_SIGNAL_STRENGTH_CHANGED = 200;
-
     NetworkController mNC;
 
     private boolean mWifiVisible = false;
@@ -53,15 +51,9 @@ public class SignalClusterView
     private int mAirplaneIconId = 0;
     private String mWifiDescription, mMobileDescription, mMobileTypeDescription;
     private static final int STYLE_HIDE = 0;
-    private static final int STYLE_SHOW = 1;
-    private static final int STYLE_SHOW_DBM = 2;
-
     private boolean showingSignalText = false;
     private boolean showingWiFiText = false;
     private boolean showingAltCluster = false;
-
-    private boolean showingSignalText = false;
-    private boolean showingWiFiText = false;
 
     ViewGroup mWifiGroup, mMobileGroup;
     ImageView mWifi, mMobile, mWifiActivity, mMobileActivity, mMobileType, mAirplane;
@@ -280,36 +272,5 @@ public class SignalClusterView
         apply();
     }
 
-    class SettingsObserver extends ContentObserver {
-        SettingsObserver(Handler handler) {
-            super(handler);
-        }
-
-        void observe() {
-            ContentResolver resolver = mContext.getContentResolver();
-            resolver.registerContentObserver(
-                    Settings.System.getUriFor(Settings.System.STATUSBAR_SIGNAL_TEXT), false,
-                    this);
-            resolver.registerContentObserver(
-                    Settings.System.getUriFor(Settings.System.STATUSBAR_WIFI_SIGNAL_TEXT), false,
-                    this);
-            updateSettings();
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            updateSettings();
-        }
-    }
-
-    protected void updateSettings() {
-        ContentResolver resolver = mContext.getContentResolver();
-
-        showingSignalText = Settings.System.getInt(resolver,
-                Settings.System.STATUSBAR_SIGNAL_TEXT, 0) != 0;
-        showingWiFiText = Settings.System.getInt(resolver,
-                Settings.System.STATUSBAR_WIFI_SIGNAL_TEXT, 0) != 0;
-        apply();
-    }
 }
 

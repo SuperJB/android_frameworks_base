@@ -1976,7 +1976,7 @@ public class Intent implements Parcelable, Cloneable {
 
     /**
      * Broadcast Action:  External media is present, but not mounted at its mount point.
-     * The path to the mount point for the removed media is contained in the Intent.mData field.
+     * The path to the mount point for the unmounted media is contained in the Intent.mData field.
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_MEDIA_UNMOUNTED = "android.intent.action.MEDIA_UNMOUNTED";
@@ -1997,7 +1997,7 @@ public class Intent implements Parcelable, Cloneable {
 
     /**
      * Broadcast Action:  External media is present and mounted at its mount point.
-     * The path to the mount point for the removed media is contained in the Intent.mData field.
+     * The path to the mount point for the mounted media is contained in the Intent.mData field.
      * The Intent contains an extra with name "read-only" and Boolean value to indicate if the
      * media was mounted read only.
      */
@@ -2028,7 +2028,7 @@ public class Intent implements Parcelable, Cloneable {
 
     /**
      * Broadcast Action:  External media is present but cannot be mounted.
-     * The path to the mount point for the removed media is contained in the Intent.mData field.
+     * The path to the mount point for the unmountable media is contained in the Intent.mData field.
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_MEDIA_UNMOUNTABLE = "android.intent.action.MEDIA_UNMOUNTABLE";
